@@ -56,14 +56,14 @@ export function AppSidebar({
           'flex items-center gap-2.5 rounded-md pb-1.5 outline-none focus-visible:ring-2 focus-visible:ring-ring/60',
           collapsed ? 'justify-center' : 'pl-1.5',
         )}
-        aria-label="OSGB Suite ana sayfa"
+        aria-label="OSGB ana sayfa"
       >
         <span className="flex size-[30px] shrink-0 items-center justify-center rounded-[9px] bg-primary text-primary-foreground">
           <Plus className="size-3.5" strokeWidth={3} aria-hidden />
         </span>
         {collapsed ? null : (
           <span className="flex min-w-0 flex-col">
-            <span className="truncate text-lg leading-5 font-bold text-foreground">OSGB Suite</span>
+            <span className="truncate text-lg leading-5 font-bold text-foreground">OSGB</span>
             <span className="truncate text-[10.5px] leading-3.5 font-medium text-primary-dark">
               İş Sağlığı ve Güvenliği
             </span>

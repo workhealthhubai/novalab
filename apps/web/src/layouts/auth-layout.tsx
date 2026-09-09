@@ -15,7 +15,7 @@ export function AuthLayout() {
           <Plus className="size-4" strokeWidth={3} aria-hidden />
         </span>
         <span className="flex flex-col">
-          <span className="text-lg leading-5 font-bold text-foreground">OSGB Suite</span>
+          <span className="text-lg leading-5 font-bold text-foreground">OSGB</span>
           <span className="text-[10.5px] leading-3.5 font-medium text-primary-dark">
             İş Sağlığı ve Güvenliği Platformu
           </span>
@@ -24,7 +24,7 @@ export function AuthLayout() {
       <main className="w-full max-w-[400px] rounded-xl border border-border bg-card p-6 shadow-xs sm:p-8">
         <Outlet />
       </main>
-      <p className="mt-6 text-xs text-muted-foreground">© {new Date().getFullYear()} OSGB Suite</p>
+      <p className="mt-6 text-xs text-muted-foreground">© {new Date().getFullYear()} OSGB</p>
     </div>
   );
 }

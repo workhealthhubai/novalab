@@ -66,7 +66,7 @@ export function AppTopbar() {
         className="flex min-w-0 items-center gap-2 text-base font-semibold"
       >
         <span className="hidden text-muted-foreground sm:inline">
-          {currentSection?.label ?? 'OSGB Suite'}
+          {currentSection?.label ?? 'OSGB'}
         </span>
         <span className="hidden text-muted-foreground sm:inline" aria-hidden>
           ›
