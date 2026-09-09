@@ -11,6 +11,7 @@ import type { LinkStudyDto } from './dto/link-study.dto';
 import type { RadiologyQueryDto } from './dto/radiology-query.dto';
 import type { RadiologyReportDto } from './dto/radiology-report.dto';
 import { RadiologyRepository } from './radiology.repository';
+import { type StudySummary, toStudySummary, unlinkedOnly } from './study-summary';
 
 export interface ViewerSession {
   viewerUrl: string;
@@ -88,7 +89,18 @@ export class RadiologyService {
     dto: LinkStudyDto,
     ctx: RequestContext,
   ) {
-    await this.get(tenantId, id);
+    const current = await this.get(tenantId, id);
+    if (current.status === 'CANCELLED')
+      throw new BadRequestException({
+        message: 'Cancelled requests cannot be linked',
+        errorCode: 'INVALID_STATE',
+      });
+    const linked = await this.radiology.linkedStudyUids(tenantId);
+    if (linked.has(dto.studyInstanceUid) && current.studyInstanceUid !== dto.studyInstanceUid)
+      throw new BadRequestException({
+        message: 'This study is already linked to another request',
+        errorCode: 'STUDY_ALREADY_LINKED',
+      });
     const study = await this.orthanc.findStudyByStudyInstanceUid(dto.studyInstanceUid);
     if (!study) {
       throw new NotFoundException({
@@ -143,6 +155,68 @@ export class RadiologyService {
       entityId: id,
       oldValue: { status: before.status },
       newValue: { status: 'REPORTED' }, // report text is medical data - not audited
+      ...ctx,
+    });
+    return request;
+  }
+
+  /** Study tags from the PACS for a linked request (null when the study vanished from Orthanc). */
+  async studyDetails(tenantId: string, id: string): Promise<StudySummary | null> {
+    const request = await this.get(tenantId, id);
+    if (!request.studyInstanceUid) return null;
+    const study = await this.orthanc.findStudyByStudyInstanceUid(request.studyInstanceUid);
+    if (!study) return null;
+    const [detailed] = await this.orthanc.findStudies(
+      { StudyInstanceUID: request.studyInstanceUid },
+      1,
+    );
+    return toStudySummary(detailed ?? study);
+  }
+
+  /**
+   * PACS studies that probably belong to the request's patient: PatientID equal to the employee id
+   * or the TC Kimlik No, plus a family^given name match. Already linked studies are excluded.
+   */
+  async pacsCandidates(tenantId: string, id: string): Promise<StudySummary[]> {
+    const request = await this.get(tenantId, id);
+    const employee = await this.employees.findById(tenantId, request.employeeId);
+    if (!employee) return [];
+    const queries: Array<Record<string, string>> = [{ PatientID: employee.id }];
+    if (employee.nationalId) queries.push({ PatientID: employee.nationalId });
+    const family = employee.lastName.toLocaleUpperCase('tr-TR').replace(/[^A-ZÇĞİÖŞÜ ]/g, '');
+    const given = employee.firstName.toLocaleUpperCase('tr-TR').replace(/[^A-ZÇĞİÖŞÜ ]/g, '');
+    if (family && given) queries.push({ PatientName: `${family}^${given}*` });
+    const results = await Promise.all(queries.map((q) => this.orthanc.findStudies(q, 20)));
+    const linked = await this.radiology.linkedStudyUids(tenantId);
+    return unlinkedOnly(results.flat().map(toStudySummary), linked);
+  }
+
+  /** Newest PACS studies not yet attached to any request of the tenant (worklist of incoming images). */
+  async unlinkedStudies(tenantId: string, limit: number): Promise<StudySummary[]> {
+    const [studies, linked] = await Promise.all([
+      this.orthanc.findStudies({}, Math.min(limit * 2, 100)),
+      this.radiology.linkedStudyUids(tenantId),
+    ]);
+    return unlinkedOnly(studies.map(toStudySummary), linked).slice(0, limit);
+  }
+
+  async cancel(tenantId: string, actor: AuthenticatedUser, id: string, ctx: RequestContext) {
+    const before = await this.get(tenantId, id);
+    if (before.status === 'REPORTED' || before.status === 'CANCELLED') {
+      throw new BadRequestException({
+        message: 'Reported or cancelled requests cannot be cancelled',
+        errorCode: 'INVALID_STATE',
+      });
+    }
+    const request = await this.radiology.update(tenantId, id, { status: 'CANCELLED' });
+    await this.audit.log({
+      tenantId,
+      userId: actor.id,
+      action: AuditAction.UPDATE,
+      entityType: 'RadiologyRequest',
+      entityId: id,
+      oldValue: { status: before.status },
+      newValue: { status: 'CANCELLED' },
       ...ctx,
     });
     return request;

@@ -52,6 +52,6 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
         errorCode: 'TENANT_SUSPENDED',
       });
     }
-    return resolved.user;
+    return { ...resolved.user, ...(payload.sid ? { sessionId: payload.sid } : {}) };
   }
 }

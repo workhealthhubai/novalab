@@ -3,6 +3,8 @@ import {
   Controller,
   Get,
   Header,
+  HttpCode,
+  HttpStatus,
   Param,
   Patch,
   Post,
@@ -24,7 +26,7 @@ import {
 } from '@/common/interfaces';
 import type { AppConfig } from '@/config/configuration';
 import { CreateRadiologyRequestDto } from './dto/create-radiology-request.dto';
-import { LinkStudyDto } from './dto/link-study.dto';
+import { LinkStudyDto, PacsListQueryDto } from './dto/link-study.dto';
 import { RadiologyQueryDto } from './dto/radiology-query.dto';
 import { RadiologyReportDto } from './dto/radiology-report.dto';
 import { RadiologyService } from './radiology.service';
@@ -50,6 +52,13 @@ export class RadiologyController {
     return this.radiology.pacsStatus();
   }
 
+  @Get('pacs/unlinked')
+  @RequirePermissions(PERMISSIONS.RADIOLOGY_READ)
+  @ApiOperation({ summary: 'Newest PACS studies not attached to any request' })
+  unlinked(@CurrentTenant() tenantId: string, @Query() query: PacsListQueryDto) {
+    return this.radiology.unlinkedStudies(tenantId, query.limit);
+  }
+
   @Get()
   @RequirePermissions(PERMISSIONS.RADIOLOGY_READ)
   list(@CurrentTenant() tenantId: string, @Query() query: RadiologyQueryDto) {
@@ -60,6 +69,32 @@ export class RadiologyController {
   @RequirePermissions(PERMISSIONS.RADIOLOGY_READ)
   get(@CurrentTenant() tenantId: string, @Param() { id }: IdParamDto) {
     return this.radiology.get(tenantId, id);
+  }
+
+  @Get(':id/study')
+  @RequirePermissions(PERMISSIONS.RADIOLOGY_READ)
+  @ApiOperation({ summary: 'PACS study tags of the linked study' })
+  study(@CurrentTenant() tenantId: string, @Param() { id }: IdParamDto) {
+    return this.radiology.studyDetails(tenantId, id);
+  }
+
+  @Get(':id/pacs-candidates')
+  @RequirePermissions(PERMISSIONS.RADIOLOGY_CREATE)
+  @ApiOperation({ summary: "PACS studies matching the request's patient (id, TC or name)" })
+  candidates(@CurrentTenant() tenantId: string, @Param() { id }: IdParamDto) {
+    return this.radiology.pacsCandidates(tenantId, id);
+  }
+
+  @Post(':id/cancel')
+  @HttpCode(HttpStatus.OK)
+  @RequirePermissions(PERMISSIONS.RADIOLOGY_CREATE)
+  cancel(
+    @CurrentTenant() tenantId: string,
+    @CurrentUser() actor: AuthenticatedUser,
+    @Param() { id }: IdParamDto,
+    @Req() req: RequestWithUser,
+  ) {
+    return this.radiology.cancel(tenantId, actor, id, extractRequestContext(req));
   }
 
   @Post()

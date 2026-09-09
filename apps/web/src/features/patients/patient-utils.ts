@@ -31,6 +31,7 @@ export function formatDateTime(value: string | null | undefined): string {
 export function toFormValues(patient: Patient): PatientFormValues {
   return {
     companyId: patient.companyId ?? '',
+    occupationId: patient.occupationId ?? '',
     nationalId: patient.nationalId ?? '',
     registrationNumber: patient.registrationNumber ?? '',
     passportNumber: patient.passportNumber ?? '',

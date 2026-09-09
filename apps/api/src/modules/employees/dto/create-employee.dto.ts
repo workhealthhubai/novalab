@@ -167,6 +167,17 @@ export class CreateEmployeeDto {
   @MaxLength(2000)
   notes?: string;
 
+  @ApiPropertyOptional({
+    format: 'uuid',
+    nullable: true,
+    description: 'Occupation from the catalogue; null clears',
+  })
+  @Transform(({ value }: { value: unknown }) => (value === '' ? null : value))
+  @IsOptional()
+  @ValidateIf((_, value) => value !== null)
+  @IsUUID()
+  occupationId?: string | null;
+
   @ApiPropertyOptional()
   @Transform(emptyToUndefined)
   @IsOptional()

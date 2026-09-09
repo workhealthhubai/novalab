@@ -110,8 +110,9 @@ export class AuthService {
 
   /**
    * Refresh token rotation with reuse detection:
-   * a presented token that belongs to an already-rotated/revoked session revokes
-   * every session of that user (the token was probably stolen).
+   * a presented token that belongs to an already-rotated session (or whose hash does not match)
+   * revokes every session of that user (the token was probably stolen). A session merely revoked
+   * by logout/admin is rejected without that cascade.
    */
   async refresh(refreshToken: string, ctx: RequestContext): Promise<TokenPair> {
     const payload = this.verifyRefreshToken(refreshToken, false);
@@ -122,6 +123,15 @@ export class AuthService {
       throw new UnauthorizedException({
         message: 'Invalid refresh token',
         errorCode: 'INVALID_REFRESH_TOKEN',
+      });
+    }
+    // Reuse = a token that was already rotated (replacedById set) or one that does not match the
+    // stored hash. A session revoked by logout or by an admin is simply dead: rejecting it must
+    // not cascade to the user's other devices.
+    if (session.revokedAt && !session.replacedById && session.tokenHash === presentedHash) {
+      throw new UnauthorizedException({
+        message: 'Session has been signed out',
+        errorCode: 'SESSION_REVOKED',
       });
     }
     if (session.revokedAt || session.tokenHash !== presentedHash) {
@@ -203,10 +213,12 @@ export class AuthService {
     ctx: RequestContext,
     rotatedFromSessionId?: string,
   ): Promise<TokenPair> {
+    const sessionId = randomUUID();
     const accessPayload: AccessTokenPayload = {
       sub: user.id,
       tid: user.tenantId,
       email: user.email,
+      sid: sessionId,
       type: 'access',
     };
     const accessToken = await this.jwt.signAsync(accessPayload, {
@@ -215,7 +227,6 @@ export class AuthService {
       issuer: this.jwtConfig.issuer,
     });
 
-    const sessionId = randomUUID();
     const refreshPayload: RefreshTokenPayload = {
       sub: user.id,
       tid: user.tenantId,

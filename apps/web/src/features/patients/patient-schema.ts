@@ -15,6 +15,7 @@ const optionalText = (max: number) =>
 export const patientSchema = z.object({
   /** Optional: the workplace can be assigned after registration. */
   companyId: z.string(),
+  occupationId: z.string(),
   nationalId: z
     .string()
     .trim()
@@ -72,6 +73,7 @@ export type PatientFormOutput = z.output<typeof patientSchema>;
 
 export const emptyPatientForm: PatientFormValues = {
   companyId: '',
+  occupationId: '',
   nationalId: '',
   registrationNumber: '',
   passportNumber: '',
@@ -99,6 +101,7 @@ const blank = (value: string | undefined) =>
 export function toPatientInput(values: PatientFormOutput): PatientInput {
   return {
     companyId: blank(values.companyId),
+    occupationId: blank(values.occupationId) ?? null,
     nationalId: values.nationalId.trim(),
     registrationNumber: blank(values.registrationNumber),
     passportNumber: blank(values.passportNumber)?.toUpperCase(),

@@ -19,7 +19,8 @@ function Calendar({ className, classNames, ...props }: ComponentProps<typeof Day
       className={cn('w-fit p-1 text-foreground select-none', className)}
       classNames={{
         root: cn(defaults.root, 'relative'),
-        months: 'relative flex flex-col gap-4',
+        // Two-month range calendars sit side by side on wide screens, stacked on phones.
+        months: 'relative flex flex-col gap-4 sm:flex-row',
         month: 'flex flex-col gap-3',
         month_caption: 'flex h-8 items-center justify-center pr-16 pl-1',
         // Preflight makes <svg> block-level, so the label must be a flex row for its chevron.
@@ -41,9 +42,18 @@ function Calendar({ className, classNames, ...props }: ComponentProps<typeof Day
         week: 'mt-1 flex',
         day: 'relative size-9 p-0 text-center text-sm',
         day_button:
-          'size-9 rounded-md font-normal transition-colors hover:bg-muted focus-visible:ring-offset-0 aria-selected:hover:bg-primary-dark',
-        selected: '[&>button]:bg-primary [&>button]:font-medium [&>button]:text-primary-foreground',
-        today: '[&>button]:bg-primary-soft [&>button]:font-semibold [&>button]:text-primary-dark',
+          'size-9 rounded-md font-normal transition-colors hover:bg-muted focus-visible:ring-offset-0',
+        // Hover must not wash out a selected day (the hover utility on the button would win otherwise).
+        selected:
+          '[&>button]:bg-primary [&>button]:font-medium [&>button]:text-primary-foreground [&>button:hover]:bg-primary-dark',
+        // A ring (not a fill) so today stays readable when it is also selected or inside a range.
+        today:
+          '[&>button]:font-semibold [&>button]:ring-1 [&>button]:ring-primary/50 [&>button]:ring-inset',
+        // Only flatten the inner corners when the other end exists; a single day keeps its radius.
+        range_start: 'range-start [&:not(.range-end)>button]:rounded-r-none',
+        range_end: 'range-end [&:not(.range-start)>button]:rounded-l-none',
+        range_middle:
+          '[&>button]:rounded-none [&>button]:bg-primary-soft! [&>button]:font-normal! [&>button]:text-primary-dark! [&>button:hover]:bg-primary-soft!',
         outside: 'text-muted-foreground/50',
         disabled: 'text-muted-foreground/40 [&>button]:pointer-events-none',
         hidden: 'invisible',

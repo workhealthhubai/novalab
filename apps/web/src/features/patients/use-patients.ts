@@ -14,11 +14,12 @@ export const patientKeys = {
   detail: (id: string) => ['patients', 'detail', id] as const,
 };
 
-export function usePatients(query: PatientListQuery) {
+export function usePatients(query: PatientListQuery, enabled = true) {
   return useQuery({
     queryKey: patientKeys.list(query),
     queryFn: () => patientsService.list(query),
     placeholderData: keepPreviousData,
+    enabled,
   });
 }
 

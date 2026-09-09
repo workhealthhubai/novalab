@@ -29,6 +29,7 @@ import {
   patientSchema,
 } from './patient-schema';
 import { useCompanies } from './use-patients';
+import { useOccupations } from '@/features/occupations/use-occupations';
 
 interface PatientFormProps {
   defaultValues?: PatientFormValues;
@@ -69,6 +70,15 @@ export function PatientForm({
   } = form;
   const isEdit = patient !== undefined;
   const companies = useCompanies();
+  const occupations = useOccupations({ pageSize: 100, isActive: true }, isEdit);
+  const occupationOptions = useMemo(
+    () =>
+      (occupations.data?.items ?? []).map((o) => ({
+        value: o.id,
+        label: o.code ? `${o.name} (${o.code})` : o.name,
+      })),
+    [occupations.data],
+  );
   const companyOptions = useMemo(
     () => (companies.data?.items ?? []).map((c) => ({ value: c.id, label: c.name })),
     [companies.data],
@@ -328,6 +338,27 @@ export function PatientForm({
                       placeholder="Firma seçin"
                       searchPlaceholder="Firma ara…"
                       invalid={Boolean(errors.companyId)}
+                    />
+                  </FormField>
+                )}
+              />
+              <Controller
+                control={control}
+                name="occupationId"
+                render={({ field }) => (
+                  <FormField
+                    id="patient-occupation"
+                    label="Meslek"
+                    error={errors.occupationId?.message}
+                  >
+                    <Combobox
+                      id="patient-occupation"
+                      value={field.value || null}
+                      onChange={(next) => field.onChange(next ?? '')}
+                      options={occupationOptions}
+                      loading={occupations.isPending}
+                      placeholder="Meslek seçin"
+                      searchPlaceholder="Meslek ara…"
                     />
                   </FormField>
                 )}

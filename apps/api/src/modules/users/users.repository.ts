@@ -103,6 +103,15 @@ export class UsersRepository {
     });
   }
 
+  /** Invalidates every refresh session of the user (after an admin password reset or a status change). */
+  async revokeSessions(userId: string): Promise<number> {
+    const { count } = await this.prisma.refreshSession.updateMany({
+      where: { userId, revokedAt: null },
+      data: { revokedAt: new Date() },
+    });
+    return count;
+  }
+
   update(tenantId: string, id: string, data: Prisma.UserUpdateInput): Promise<User> {
     // updateMany + re-read keeps the tenant filter in the WHERE clause.
     return this.prisma.$transaction(async (tx) => {

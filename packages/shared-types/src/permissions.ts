@@ -27,6 +27,23 @@ export const PERMISSIONS = {
   WORKPLACES_READ: 'workplaces.read',
   WORKPLACES_MANAGE: 'workplaces.manage',
 
+  PHYSICIANS_READ: 'physicians.read',
+  PHYSICIANS_MANAGE: 'physicians.manage',
+
+  TESTS_READ: 'tests.read',
+  TESTS_MANAGE: 'tests.manage',
+
+  OCCUPATIONS_READ: 'occupations.read',
+  OCCUPATIONS_MANAGE: 'occupations.manage',
+
+  CONSENTS_READ: 'consents.read',
+  CONSENTS_MANAGE: 'consents.manage',
+
+  PROTOCOLS_READ: 'protocols.read',
+  PROTOCOLS_CREATE: 'protocols.create',
+  PROTOCOLS_UPDATE: 'protocols.update',
+  PROTOCOLS_CLOSE: 'protocols.close',
+
   EXAMINATIONS_READ: 'examinations.read',
   EXAMINATIONS_CREATE: 'examinations.create',
   EXAMINATIONS_UPDATE: 'examinations.update',
@@ -35,6 +52,21 @@ export const PERMISSIONS = {
   RADIOLOGY_READ: 'radiology.read',
   RADIOLOGY_CREATE: 'radiology.create',
   RADIOLOGY_REPORT: 'radiology.report',
+
+  AUDIOMETRY_READ: 'audiometry.read',
+  AUDIOMETRY_MANAGE: 'audiometry.manage',
+
+  ECG_READ: 'ecg.read',
+  ECG_MANAGE: 'ecg.manage',
+
+  SPIROMETRY_READ: 'spirometry.read',
+  SPIROMETRY_MANAGE: 'spirometry.manage',
+
+  EYE_READ: 'eye.read',
+  EYE_MANAGE: 'eye.manage',
+
+  PNEUMOCONIOSIS_READ: 'pneumoconiosis.read',
+  PNEUMOCONIOSIS_MANAGE: 'pneumoconiosis.manage',
 
   APPOINTMENTS_READ: 'appointments.read',
   APPOINTMENTS_MANAGE: 'appointments.manage',
@@ -48,6 +80,7 @@ export const PERMISSIONS = {
   DOCUMENTS_READ: 'documents.read',
   DOCUMENTS_UPLOAD: 'documents.upload',
   DOCUMENTS_DELETE: 'documents.delete',
+  DOCUMENTS_SIGN: 'documents.sign',
 
   REPORTS_EXPORT: 'reports.export',
 
@@ -64,8 +97,18 @@ export type PermissionCategory =
   | 'companies'
   | 'employees'
   | 'workplaces'
+  | 'physicians'
+  | 'tests'
+  | 'occupations'
+  | 'consents'
+  | 'protocols'
   | 'examinations'
   | 'radiology'
+  | 'audiometry'
+  | 'ecg'
+  | 'spirometry'
+  | 'eye'
+  | 'pneumoconiosis'
   | 'appointments'
   | 'trainings'
   | 'certificates'
@@ -124,6 +167,66 @@ export const PERMISSION_DEFINITIONS: readonly PermissionDefinition[] = [
     description: 'Create/update workplaces',
   },
   {
+    key: PERMISSIONS.PHYSICIANS_READ,
+    category: 'physicians',
+    description: 'View physician definitions',
+  },
+  {
+    key: PERMISSIONS.PHYSICIANS_MANAGE,
+    category: 'physicians',
+    description: 'Create/update physicians, signatures and user links',
+  },
+  {
+    key: PERMISSIONS.TESTS_READ,
+    category: 'tests',
+    description: 'View the test catalogue and prices',
+  },
+  {
+    key: PERMISSIONS.TESTS_MANAGE,
+    category: 'tests',
+    description: 'Create/update test definitions and prices',
+  },
+  {
+    key: PERMISSIONS.OCCUPATIONS_READ,
+    category: 'occupations',
+    description: 'View occupation definitions',
+  },
+  {
+    key: PERMISSIONS.OCCUPATIONS_MANAGE,
+    category: 'occupations',
+    description: 'Create/update occupation definitions',
+  },
+  {
+    key: PERMISSIONS.CONSENTS_READ,
+    category: 'consents',
+    description: 'View KVKK consent texts and patient consents',
+  },
+  {
+    key: PERMISSIONS.CONSENTS_MANAGE,
+    category: 'consents',
+    description: 'Publish consent text versions, record and withdraw patient consents',
+  },
+  {
+    key: PERMISSIONS.PROTOCOLS_READ,
+    category: 'protocols',
+    description: 'View visit protocols and their test items',
+  },
+  {
+    key: PERMISSIONS.PROTOCOLS_CREATE,
+    category: 'protocols',
+    description: 'Open a visit protocol for a patient',
+  },
+  {
+    key: PERMISSIONS.PROTOCOLS_UPDATE,
+    category: 'protocols',
+    description: 'Update protocol items and notes',
+  },
+  {
+    key: PERMISSIONS.PROTOCOLS_CLOSE,
+    category: 'protocols',
+    description: 'Close or cancel a protocol',
+  },
+  {
     key: PERMISSIONS.EXAMINATIONS_READ,
     category: 'examinations',
     description: 'View medical examinations',
@@ -166,6 +269,66 @@ export const PERMISSION_DEFINITIONS: readonly PermissionDefinition[] = [
     medical: true,
   },
   {
+    key: PERMISSIONS.AUDIOMETRY_READ,
+    category: 'audiometry',
+    description: 'View audiometry tests (medical data)',
+    medical: true,
+  },
+  {
+    key: PERMISSIONS.AUDIOMETRY_MANAGE,
+    category: 'audiometry',
+    description: 'Record, edit and delete audiometry tests',
+    medical: true,
+  },
+  {
+    key: PERMISSIONS.ECG_READ,
+    category: 'ecg',
+    description: 'View ECG records (medical data)',
+    medical: true,
+  },
+  {
+    key: PERMISSIONS.ECG_MANAGE,
+    category: 'ecg',
+    description: 'Record, edit and delete ECG records and attach device printouts',
+    medical: true,
+  },
+  {
+    key: PERMISSIONS.SPIROMETRY_READ,
+    category: 'spirometry',
+    description: 'View spirometry tests (medical data)',
+    medical: true,
+  },
+  {
+    key: PERMISSIONS.SPIROMETRY_MANAGE,
+    category: 'spirometry',
+    description: 'Record, edit and delete spirometry tests and attach printouts',
+    medical: true,
+  },
+  {
+    key: PERMISSIONS.EYE_READ,
+    category: 'eye',
+    description: 'View eye examinations (medical data)',
+    medical: true,
+  },
+  {
+    key: PERMISSIONS.EYE_MANAGE,
+    category: 'eye',
+    description: 'Record, edit and delete eye examinations',
+    medical: true,
+  },
+  {
+    key: PERMISSIONS.PNEUMOCONIOSIS_READ,
+    category: 'pneumoconiosis',
+    description: 'View ILO pneumoconiosis readings (medical data)',
+    medical: true,
+  },
+  {
+    key: PERMISSIONS.PNEUMOCONIOSIS_MANAGE,
+    category: 'pneumoconiosis',
+    description: 'Record, edit and delete ILO pneumoconiosis readings',
+    medical: true,
+  },
+  {
     key: PERMISSIONS.APPOINTMENTS_READ,
     category: 'appointments',
     description: 'View appointments',
@@ -194,6 +357,11 @@ export const PERMISSION_DEFINITIONS: readonly PermissionDefinition[] = [
   },
   { key: PERMISSIONS.DOCUMENTS_UPLOAD, category: 'documents', description: 'Upload documents' },
   { key: PERMISSIONS.DOCUMENTS_DELETE, category: 'documents', description: 'Delete documents' },
+  {
+    key: PERMISSIONS.DOCUMENTS_SIGN,
+    category: 'documents',
+    description: 'Have patients sign forms on the signature pad and store the signed PDFs',
+  },
   { key: PERMISSIONS.REPORTS_EXPORT, category: 'reports', description: 'Export reports' },
   { key: PERMISSIONS.AUDIT_READ, category: 'audit', description: 'Read audit logs' },
   {

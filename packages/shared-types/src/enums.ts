@@ -40,6 +40,84 @@ export const ExaminationType = {
 } as const;
 export type ExaminationType = (typeof ExaminationType)[keyof typeof ExaminationType];
 
+export const PhysicianStatus = {
+  ACTIVE: 'ACTIVE',
+  INACTIVE: 'INACTIVE',
+} as const;
+export type PhysicianStatus = (typeof PhysicianStatus)[keyof typeof PhysicianStatus];
+
+/** KVKK consent text kinds. */
+export const ConsentType = {
+  /** Aydınlatma metni (KVKK m.10) — acknowledgement, not a consent. */
+  DISCLOSURE: 'DISCLOSURE',
+  /** Açık rıza (KVKK m.5). */
+  EXPLICIT_CONSENT: 'EXPLICIT_CONSENT',
+  /** Özel nitelikli sağlık verilerinin işlenmesine açık rıza (KVKK m.6). */
+  HEALTH_DATA: 'HEALTH_DATA',
+  /** Ticari elektronik ileti / iletişim izni. */
+  COMMUNICATION: 'COMMUNICATION',
+} as const;
+export type ConsentType = (typeof ConsentType)[keyof typeof ConsentType];
+
+export const ConsentStatus = {
+  GIVEN: 'GIVEN',
+  WITHDRAWN: 'WITHDRAWN',
+} as const;
+export type ConsentStatus = (typeof ConsentStatus)[keyof typeof ConsentStatus];
+
+export const ConsentMethod = {
+  PAPER: 'PAPER',
+  SIGNATURE_PAD: 'SIGNATURE_PAD',
+  ELECTRONIC: 'ELECTRONIC',
+  VERBAL: 'VERBAL',
+} as const;
+export type ConsentMethod = (typeof ConsentMethod)[keyof typeof ConsentMethod];
+
+/** Lifecycle of a visit protocol (Protokol). */
+export const ProtocolStatus = {
+  OPEN: 'OPEN',
+  IN_PROGRESS: 'IN_PROGRESS',
+  COMPLETED: 'COMPLETED',
+  CANCELLED: 'CANCELLED',
+} as const;
+export type ProtocolStatus = (typeof ProtocolStatus)[keyof typeof ProtocolStatus];
+
+/** Tests / outputs that can be ordered on a protocol (one per doctor-module screen). */
+export const ProtocolItemType = {
+  RADIOLOGY: 'RADIOLOGY',
+  AUDIOMETRY: 'AUDIOMETRY',
+  ECG: 'ECG',
+  SPIROMETRY: 'SPIROMETRY',
+  EYE: 'EYE',
+  PNEUMOCONIOSIS: 'PNEUMOCONIOSIS',
+  LAB: 'LAB',
+  HEALTH_REPORT: 'HEALTH_REPORT',
+  ISG_REPORT: 'ISG_REPORT',
+} as const;
+export type ProtocolItemType = (typeof ProtocolItemType)[keyof typeof ProtocolItemType];
+
+/** Catalogue category of a test definition: the doctor-module screen it belongs to. */
+export const TestCategory = {
+  RADIOLOGY: 'RADIOLOGY',
+  AUDIOMETRY: 'AUDIOMETRY',
+  ECG: 'ECG',
+  SPIROMETRY: 'SPIROMETRY',
+  EYE: 'EYE',
+  PNEUMOCONIOSIS: 'PNEUMOCONIOSIS',
+  LAB: 'LAB',
+  HEALTH_REPORT: 'HEALTH_REPORT',
+  ISG_REPORT: 'ISG_REPORT',
+  OTHER: 'OTHER',
+} as const;
+export type TestCategory = (typeof TestCategory)[keyof typeof TestCategory];
+
+export const ProtocolItemStatus = {
+  PENDING: 'PENDING',
+  DONE: 'DONE',
+  CANCELLED: 'CANCELLED',
+} as const;
+export type ProtocolItemStatus = (typeof ProtocolItemStatus)[keyof typeof ProtocolItemStatus];
+
 export const ExaminationStatus = {
   SCHEDULED: 'SCHEDULED',
   IN_PROGRESS: 'IN_PROGRESS',
@@ -100,6 +178,12 @@ export const DocumentCategory = {
   REPORT: 'REPORT',
   CERTIFICATE: 'CERTIFICATE',
   SCANNED_DOCUMENT: 'SCANNED_DOCUMENT',
+  /** PDF signed by the patient on the signature pad (Belge İmza). */
+  SIGNED_FORM: 'SIGNED_FORM',
+  /** ECG device printout (PDF / image) attached to an EKG record. */
+  ECG_TRACE: 'ECG_TRACE',
+  /** Spirometer printout attached to a spirometry test. */
+  SPIROMETRY_TRACE: 'SPIROMETRY_TRACE',
   ATTACHMENT: 'ATTACHMENT',
   OTHER: 'OTHER',
 } as const;

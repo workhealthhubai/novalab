@@ -33,6 +33,7 @@ export interface Patient {
   addressNeighborhoodId: number | null;
   addressLine: string | null;
   notes: string | null;
+  occupationId: string | null;
   jobTitle: string | null;
   department: string | null;
   hireDate: string | null;
@@ -47,6 +48,7 @@ export interface Patient {
   company?: NamedRef;
   branch?: NamedRef | null;
   workplace?: NamedRef | null;
+  occupation?: { id: string; name: string; code: string | null } | null;
   addressProvince?: LocationRef | null;
   addressDistrict?: LocationRef | null;
   addressNeighborhood?: LocationRef | null;
@@ -64,7 +66,10 @@ export type PatientListItem = Pick<
   | 'status'
   | 'identityVerificationStatus'
   | 'company'
->;
+> & {
+  /** Present on list rows that include it; used for sex-specific reference ranges. */
+  gender?: Gender | null;
+};
 
 /** Payload accepted by POST/PATCH /employees. */
 export interface PatientInput {
@@ -86,6 +91,7 @@ export interface PatientInput {
   addressNeighborhoodId?: number | null;
   addressLine?: string;
   notes?: string;
+  occupationId?: string | null;
   status?: EmployeeStatus;
 }
 

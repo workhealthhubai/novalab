@@ -11,6 +11,7 @@ import { AuditService } from '@/modules/audit/audit.service';
 import { CompaniesRepository } from '@/modules/companies/companies.repository';
 import { IdentityVerificationService } from '@/modules/identity/identity-verification.service';
 import { LocationsService } from '@/modules/locations/locations.service';
+import { OccupationsService } from '@/modules/occupations/occupations.service';
 import type { CreateEmployeeDto } from './dto/create-employee.dto';
 import type { EmployeeQueryDto } from './dto/employee-query.dto';
 import type { MarkIdentityVerifiedDto } from './dto/mark-identity-verified.dto';
@@ -56,6 +57,7 @@ export class EmployeesService {
     private readonly audit: AuditService,
     private readonly queue: QueueService,
     private readonly storage: StorageService,
+    private readonly occupations: OccupationsService,
   ) {}
 
   async list(tenantId: string, query: EmployeeQueryDto) {
@@ -349,6 +351,12 @@ export class EmployeesService {
   }
 
   private async assertReferences(tenantId: string, dto: Partial<CreateEmployeeDto>): Promise<void> {
+    if (dto.occupationId && !(await this.occupations.exists(tenantId, dto.occupationId))) {
+      throw new BadRequestException({
+        message: 'Occupation not found',
+        errorCode: 'OCCUPATION_NOT_FOUND',
+      });
+    }
     if (dto.companyId && !(await this.companies.exists(tenantId, dto.companyId))) {
       throw new BadRequestException({
         message: 'Company not found in this tenant',

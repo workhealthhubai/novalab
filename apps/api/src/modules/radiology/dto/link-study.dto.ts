@@ -1,5 +1,6 @@
-import { ApiProperty } from '@nestjs/swagger';
-import { IsString, Matches, MaxLength } from 'class-validator';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { Type } from 'class-transformer';
+import { IsInt, IsOptional, IsString, Matches, Max, MaxLength, Min } from 'class-validator';
 
 export class LinkStudyDto {
   @ApiProperty({
@@ -10,4 +11,14 @@ export class LinkStudyDto {
   @MaxLength(64)
   @Matches(/^[0-9.]+$/, { message: 'studyInstanceUid must be a valid DICOM UID' })
   studyInstanceUid!: string;
+}
+
+export class PacsListQueryDto {
+  @ApiPropertyOptional({ default: 25, minimum: 1, maximum: 100 })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(100)
+  limit = 25;
 }

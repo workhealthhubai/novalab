@@ -176,6 +176,17 @@ describe('AuthService', () => {
     );
   });
 
+  it('rejects a session revoked by logout/admin without revoking the other sessions', async () => {
+    const login = await service.login({ email: 'admin@demo.local', password: 'Admin123!' }, {});
+    const live = [...sessions.values()].find((s) => !s.revokedAt);
+    expect(live).toBeTruthy();
+    live!.revokedAt = new Date(); // admin sign-out: revoked, but never rotated
+    await expect(service.refresh(login.refreshToken, {})).rejects.toMatchObject({
+      response: { errorCode: 'SESSION_REVOKED' },
+    });
+    expect(refreshSessions.revokeAllForUser).not.toHaveBeenCalled();
+  });
+
   it('logout revokes the session and is idempotent for garbage tokens', async () => {
     const login = await service.login({ email: 'admin@demo.local', password: 'Admin123!' }, {});
     await service.logout(login.refreshToken, {});

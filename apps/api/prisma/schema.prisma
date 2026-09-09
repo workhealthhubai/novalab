@@ -69,6 +69,68 @@ enum ExaminationType {
   SPECIAL
 }
 
+enum PhysicianStatus {
+  ACTIVE
+  INACTIVE
+}
+
+enum ConsentType {
+  DISCLOSURE
+  EXPLICIT_CONSENT
+  HEALTH_DATA
+  COMMUNICATION
+}
+
+enum ConsentStatus {
+  GIVEN
+  WITHDRAWN
+}
+
+enum ConsentMethod {
+  PAPER
+  SIGNATURE_PAD
+  ELECTRONIC
+  VERBAL
+}
+
+enum ProtocolStatus {
+  OPEN
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+enum ProtocolItemType {
+  RADIOLOGY
+  AUDIOMETRY
+  ECG
+  SPIROMETRY
+  EYE
+  PNEUMOCONIOSIS
+  LAB
+  HEALTH_REPORT
+  ISG_REPORT
+}
+
+enum TestCategory {
+  RADIOLOGY
+  AUDIOMETRY
+  ECG
+  SPIROMETRY
+  EYE
+  PNEUMOCONIOSIS
+  LAB
+  HEALTH_REPORT
+  ISG_REPORT
+  OTHER
+}
+
+enum ProtocolItemStatus {
+  PENDING
+  DONE
+  CANCELLED
+}
+
 enum ExaminationStatus {
   SCHEDULED
   IN_PROGRESS
@@ -122,6 +184,9 @@ enum DocumentCategory {
   REPORT
   CERTIFICATE
   SCANNED_DOCUMENT
+  SIGNED_FORM
+  ECG_TRACE
+  SPIROMETRY_TRACE
   ATTACHMENT
   OTHER
 }
@@ -139,19 +204,34 @@ model Tenant {
   updatedAt DateTime     @updatedAt
   deletedAt DateTime?
 
-  users            User[]
-  roles            Role[]
-  userRoles        UserRole[]
-  refreshSessions  RefreshSession[]
-  companies        Company[]
-  branches         Branch[]
-  workplaces       Workplace[]
-  employees        Employee[]
-  examinations     Examination[]
-  radiologyRequests RadiologyRequest[]
-  documents        Document[]
-  appointments     Appointment[]
-  auditLogs        AuditLog[]
+  users                   User[]
+  roles                   Role[]
+  userRoles               UserRole[]
+  refreshSessions         RefreshSession[]
+  companies               Company[]
+  branches                Branch[]
+  workplaces              Workplace[]
+  employees               Employee[]
+  protocols               Protocol[]
+  physicians              Physician[]
+  testDefinitions         TestDefinition[]
+  testPackages            TestPackage[]
+  occupations             Occupation[]
+  consentTemplates        ConsentTemplate[]
+  patientConsents         PatientConsent[]
+  documentSignatures      DocumentSignature[]
+  examinationMeasurements ExaminationMeasurement[]
+  audiometryTests         AudiometryTest[]
+  ecgRecords              EcgRecord[]
+  spirometryTests         SpirometryTest[]
+  eyeExaminations         EyeExamination[]
+  pneumoconiosisReadings  PneumoconiosisReading[]
+  profile                 OrganizationProfile?
+  examinations            Examination[]
+  radiologyRequests       RadiologyRequest[]
+  documents               Document[]
+  appointments            Appointment[]
+  auditLogs               AuditLog[]
 
   @@map("tenants")
 }
@@ -174,10 +254,21 @@ model User {
   refreshSessions RefreshSession[]
   auditLogs       AuditLog[]
 
-  performedExaminations Examination[] @relation("ExaminationPhysician")
-  approvedExaminations  Examination[] @relation("ExaminationApprover")
-  uploadedDocuments     Document[]    @relation("DocumentUploader")
-  createdAppointments   Appointment[] @relation("AppointmentCreator")
+  physicianProfile       Physician?
+  collectedConsents      PatientConsent[]         @relation("ConsentCollector")
+  collectedSignatures    DocumentSignature[]      @relation("SignatureCollector")
+  recordedMeasurements   ExaminationMeasurement[] @relation("MeasurementRecorder")
+  performedAudiometry    AudiometryTest[]         @relation("AudiometryPerformer")
+  performedEcg           EcgRecord[]              @relation("EcgPerformer")
+  performedSpirometry    SpirometryTest[]         @relation("SpirometryPerformer")
+  performedEye           EyeExamination[]         @relation("EyePerformer")
+  pneumoconiosisReadings PneumoconiosisReading[]  @relation("PneumoReader")
+  openedProtocols        Protocol[]               @relation("ProtocolOpener")
+  closedProtocols        Protocol[]               @relation("ProtocolCloser")
+  performedExaminations  Examination[]            @relation("ExaminationPhysician")
+  approvedExaminations   Examination[]            @relation("ExaminationApprover")
+  uploadedDocuments      Document[]               @relation("DocumentUploader")
+  createdAppointments    Appointment[]            @relation("AppointmentCreator")
 
   @@unique([tenantId, email])
   @@index([tenantId])
@@ -248,18 +339,18 @@ model RolePermission {
 
 /// Refresh token session. Only a SHA-256 hash of the token is stored.
 model RefreshSession {
-  id        String    @id @default(uuid()) @db.Uuid
-  tenantId  String    @db.Uuid
-  userId    String    @db.Uuid
-  tokenHash String    @unique
-  userAgent String?
-  ipAddress String?
-  expiresAt DateTime
-  revokedAt DateTime?
+  id           String    @id @default(uuid()) @db.Uuid
+  tenantId     String    @db.Uuid
+  userId       String    @db.Uuid
+  tokenHash    String    @unique
+  userAgent    String?
+  ipAddress    String?
+  expiresAt    DateTime
+  revokedAt    DateTime?
   /// Set when the session was rotated; used for refresh-token reuse detection.
-  replacedById String? @db.Uuid
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
+  replacedById String?   @db.Uuid
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
 
   tenant Tenant @relation(fields: [tenantId], references: [id])
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -290,6 +381,7 @@ model Company {
   branches     Branch[]
   workplaces   Workplace[]
   employees    Employee[]
+  protocols    Protocol[]
   documents    Document[]
   appointments Appointment[]
 
@@ -346,38 +438,40 @@ model Workplace {
 }
 
 model Employee {
-  id          String         @id @default(uuid()) @db.Uuid
-  tenantId    String         @db.Uuid
+  id                    String         @id @default(uuid()) @db.Uuid
+  tenantId              String         @db.Uuid
   /// Optional at registration; the workplace can be assigned later (Hasta Kayıt → Düzenle).
-  companyId   String?        @db.Uuid
-  branchId    String?        @db.Uuid
-  workplaceId String?        @db.Uuid
+  companyId             String?        @db.Uuid
+  branchId              String?        @db.Uuid
+  workplaceId           String?        @db.Uuid
   /// National identity number (TC Kimlik No). Personal data - handle with care.
-  nationalId  String?
+  nationalId            String?
   /// Employer/registry number (Sicil No).
-  registrationNumber String?
-  passportNumber     String?
-  firstName   String
-  lastName    String
-  birthDate   DateTime?      @db.Date
-  gender      Gender?
-  motherName  String?
-  fatherName  String?
+  registrationNumber    String?
+  passportNumber        String?
+  firstName             String
+  lastName              String
+  birthDate             DateTime?      @db.Date
+  gender                Gender?
+  motherName            String?
+  fatherName            String?
   /// Mobile (GSM), 10 digits without country code.
-  phone       String?
+  phone                 String?
   /// Landline (Ev Tel), 10 digits.
-  homePhone   String?
-  email       String?
+  homePhone             String?
+  email                 String?
   addressProvinceId     Int?
   addressDistrictId     Int?
   addressNeighborhoodId Int?
   addressLine           String?
   /// Free-text warning / note shown on the patient card (Uyarı/Açıklama).
-  notes       String?
-  jobTitle    String?
-  department  String?
-  hireDate    DateTime?      @db.Date
-  status      EmployeeStatus @default(ACTIVE)
+  notes                 String?
+  /// Free-text job title kept for legacy rows; the catalogue link is preferred.
+  jobTitle              String?
+  occupationId          String?        @db.Uuid
+  department            String?
+  hireDate              DateTime?      @db.Date
+  status                EmployeeStatus @default(ACTIVE)
 
   identityVerificationStatus IdentityVerificationStatus @default(UNVERIFIED)
   identityVerifiedAt         DateTime?
@@ -388,21 +482,30 @@ model Employee {
   photoKey       String?
   photoUpdatedAt DateTime?
 
-  createdAt   DateTime       @default(now())
-  updatedAt   DateTime       @updatedAt
-  deletedAt   DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
 
-  tenant            Tenant             @relation(fields: [tenantId], references: [id])
-  company           Company?           @relation(fields: [companyId], references: [id])
-  branch            Branch?            @relation(fields: [branchId], references: [id])
-  workplace         Workplace?         @relation(fields: [workplaceId], references: [id])
-  addressProvince     Province?     @relation(fields: [addressProvinceId], references: [id])
-  addressDistrict     District?     @relation(fields: [addressDistrictId], references: [id])
-  addressNeighborhood Neighborhood? @relation(fields: [addressNeighborhoodId], references: [id])
-  examinations      Examination[]
-  radiologyRequests RadiologyRequest[]
-  documents         Document[]
-  appointments      Appointment[]
+  tenant                 Tenant                  @relation(fields: [tenantId], references: [id])
+  company                Company?                @relation(fields: [companyId], references: [id])
+  occupation             Occupation?             @relation(fields: [occupationId], references: [id])
+  branch                 Branch?                 @relation(fields: [branchId], references: [id])
+  workplace              Workplace?              @relation(fields: [workplaceId], references: [id])
+  addressProvince        Province?               @relation(fields: [addressProvinceId], references: [id])
+  addressDistrict        District?               @relation(fields: [addressDistrictId], references: [id])
+  addressNeighborhood    Neighborhood?           @relation(fields: [addressNeighborhoodId], references: [id])
+  protocols              Protocol[]
+  consents               PatientConsent[]
+  signatures             DocumentSignature[]
+  audiometryTests        AudiometryTest[]
+  ecgRecords             EcgRecord[]
+  spirometryTests        SpirometryTest[]
+  eyeExaminations        EyeExamination[]
+  pneumoconiosisReadings PneumoconiosisReading[]
+  examinations           Examination[]
+  radiologyRequests      RadiologyRequest[]
+  documents              Document[]
+  appointments           Appointment[]
 
   // Uniqueness of nationalId / registrationNumber per tenant applies to ACTIVE records only
   // (partial unique indexes, see migration *_employee_partial_unique_indexes). Prisma cannot
@@ -419,21 +522,23 @@ model Employee {
 
 /// Turkish provinces (il). `id` is the licence-plate code (1-81).
 model Province {
-  id        Int        @id
-  name      String
-  districts District[]
-  employees Employee[]
+  id                   Int                   @id
+  name                 String
+  districts            District[]
+  employees            Employee[]
+  organizationProfiles OrganizationProfile[]
 
   @@map("provinces")
 }
 
 model District {
-  id            Int            @id
-  provinceId    Int
-  name          String
-  province      Province       @relation(fields: [provinceId], references: [id])
-  neighborhoods Neighborhood[]
-  employees     Employee[]
+  id                   Int                   @id
+  provinceId           Int
+  name                 String
+  province             Province              @relation(fields: [provinceId], references: [id])
+  neighborhoods        Neighborhood[]
+  employees            Employee[]
+  organizationProfiles OrganizationProfile[]
 
   @@index([provinceId])
   @@map("districts")
@@ -458,6 +563,8 @@ model Examination {
   id                 String            @id @default(uuid()) @db.Uuid
   tenantId           String            @db.Uuid
   employeeId         String            @db.Uuid
+  /// Visit this clinical evaluation belongs to (set when opened from a protocol).
+  protocolId         String?           @db.Uuid
   type               ExaminationType
   status             ExaminationStatus @default(SCHEDULED)
   scheduledAt        DateTime?
@@ -472,22 +579,639 @@ model Examination {
   approvedById       String?           @db.Uuid
   approvedAt         DateTime?
   nextExaminationDue DateTime?         @db.Date
+  /// Structured anamnesis (Ek-2 section A) - medical data. Shape: shared `Anamnesis`.
+  anamnesis          Json?
+  /// Per-system physical examination (Ek-2 section B) - medical data. Shape: shared `SystemsExam`.
+  systemsExam        Json?
+  /// Physician profile that signs the report (title, diploma no, signature image).
+  physicianProfileId String?           @db.Uuid
+  /// Approved report PDF (Document, category REPORT).
+  reportDocumentId   String?           @unique @db.Uuid
   createdAt          DateTime          @default(now())
   updatedAt          DateTime          @updatedAt
   deletedAt          DateTime?
 
-  tenant            Tenant             @relation(fields: [tenantId], references: [id])
-  employee          Employee           @relation(fields: [employeeId], references: [id])
-  physician         User?              @relation("ExaminationPhysician", fields: [physicianId], references: [id])
-  approvedBy        User?              @relation("ExaminationApprover", fields: [approvedById], references: [id])
+  tenant            Tenant                   @relation(fields: [tenantId], references: [id])
+  employee          Employee                 @relation(fields: [employeeId], references: [id])
+  protocol          Protocol?                @relation(fields: [protocolId], references: [id])
+  physician         User?                    @relation("ExaminationPhysician", fields: [physicianId], references: [id])
+  approvedBy        User?                    @relation("ExaminationApprover", fields: [approvedById], references: [id])
+  physicianProfile  Physician?               @relation("ExaminationPhysicianProfile", fields: [physicianProfileId], references: [id])
+  reportDocument    Document?                @relation("ExaminationReport", fields: [reportDocumentId], references: [id])
   radiologyRequests RadiologyRequest[]
   documents         Document[]
   appointments      Appointment[]
+  measurements      ExaminationMeasurement[]
 
   @@index([tenantId])
   @@index([tenantId, employeeId])
   @@index([tenantId, status])
+  @@index([tenantId, protocolId])
   @@map("examinations")
+}
+
+enum EcgRhythm {
+  SINUS
+  SINUS_ARRHYTHMIA
+  SINUS_BRADYCARDIA
+  SINUS_TACHYCARDIA
+  ATRIAL_FIBRILLATION
+  ATRIAL_FLUTTER
+  SUPRAVENTRICULAR_TACHYCARDIA
+  PACED
+  OTHER
+}
+
+enum EcgInterpretation {
+  NORMAL
+  BORDERLINE
+  ABNORMAL
+}
+
+/// Resting 12-lead ECG record (EKG). Intervals in ms, axis in degrees; findings are codes from the
+/// shared ECG_FINDINGS catalogue. The device printout is a Document (category ECG_TRACE).
+model EcgRecord {
+  id             String            @id @default(uuid()) @db.Uuid
+  tenantId       String            @db.Uuid
+  employeeId     String            @db.Uuid
+  protocolId     String?           @db.Uuid
+  performedAt    DateTime          @default(now())
+  performedById  String?           @db.Uuid
+  deviceName     String?
+  heartRate      Int?
+  rhythm         EcgRhythm?
+  prInterval     Int?
+  qrsDuration    Int?
+  qtInterval     Int?
+  /// As reported by the device; when null the API derives Bazett QTc.
+  qtcInterval    Int?
+  axis           Int?
+  findings       String[]          @default([])
+  interpretation EcgInterpretation @default(NORMAL)
+  /// Physician comment - medical data.
+  comment        String?
+  documentId     String?           @unique @db.Uuid
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+  deletedAt      DateTime?
+
+  tenant      Tenant    @relation(fields: [tenantId], references: [id])
+  employee    Employee  @relation(fields: [employeeId], references: [id])
+  protocol    Protocol? @relation(fields: [protocolId], references: [id])
+  performedBy User?     @relation("EcgPerformer", fields: [performedById], references: [id])
+  document    Document? @relation(fields: [documentId], references: [id])
+
+  @@index([tenantId, employeeId, performedAt])
+  @@index([tenantId, performedAt])
+  @@map("ecg_records")
+}
+
+enum SpirometryPattern {
+  NORMAL
+  OBSTRUCTIVE
+  RESTRICTIVE
+  MIXED
+}
+
+enum SmokingStatus {
+  NEVER
+  FORMER
+  CURRENT
+}
+
+/// Spirometry test (Solunum fonksiyon testi). Volumes in litres, flows in L/s, ratio in %.
+/// Predicted values are stored when the device reports them; otherwise derived (ECSC 1993).
+model SpirometryTest {
+  id            String             @id @default(uuid()) @db.Uuid
+  tenantId      String             @db.Uuid
+  employeeId    String             @db.Uuid
+  protocolId    String?            @db.Uuid
+  performedAt   DateTime           @default(now())
+  performedById String?            @db.Uuid
+  deviceName    String?
+  heightCm      Int?
+  weightKg      Decimal?           @db.Decimal(5, 1)
+  smokingStatus SmokingStatus?
+  fvc           Decimal?           @db.Decimal(4, 2)
+  fev1          Decimal?           @db.Decimal(4, 2)
+  /// Device-reported FEV1/FVC %; null → derived from FEV1 and FVC.
+  ratio         Decimal?           @db.Decimal(4, 1)
+  pef           Decimal?           @db.Decimal(4, 2)
+  fef2575       Decimal?           @db.Decimal(4, 2)
+  fvcPredicted  Decimal?           @db.Decimal(4, 2)
+  fev1Predicted Decimal?           @db.Decimal(4, 2)
+  /// Post-bronchodilator values when a reversibility test was done.
+  postFvc       Decimal?           @db.Decimal(4, 2)
+  postFev1      Decimal?           @db.Decimal(4, 2)
+  /// Acceptability / repeatability grade reported by the device (A–F).
+  qualityGrade  String?
+  /// Reference test for the longitudinal FEV1 decline.
+  isBaseline    Boolean            @default(false)
+  pattern       SpirometryPattern?
+  /// Physician comment - medical data.
+  comment       String?
+  documentId    String?            @unique @db.Uuid
+  createdAt     DateTime           @default(now())
+  updatedAt     DateTime           @updatedAt
+  deletedAt     DateTime?
+
+  tenant      Tenant    @relation(fields: [tenantId], references: [id])
+  employee    Employee  @relation(fields: [employeeId], references: [id])
+  protocol    Protocol? @relation(fields: [protocolId], references: [id])
+  performedBy User?     @relation("SpirometryPerformer", fields: [performedById], references: [id])
+  document    Document? @relation(fields: [documentId], references: [id])
+
+  @@index([tenantId, employeeId, performedAt])
+  @@index([tenantId, performedAt])
+  @@map("spirometry_tests")
+}
+
+enum ColorVisionResult {
+  NORMAL
+  DEFICIENT
+  NOT_TESTED
+}
+
+enum VisualFieldResult {
+  NORMAL
+  ABNORMAL
+  NOT_TESTED
+}
+
+enum EyeRecommendation {
+  NONE
+  GLASSES
+  REFERRAL
+}
+
+/// Eye examination (Göz). Distance acuity as decimal (1.0 = 6/6), near acuity as Jaeger number,
+/// colour vision as Ishihara plates read / shown.
+model EyeExamination {
+  id                String            @id @default(uuid()) @db.Uuid
+  tenantId          String            @db.Uuid
+  employeeId        String            @db.Uuid
+  protocolId        String?           @db.Uuid
+  performedAt       DateTime          @default(now())
+  performedById     String?           @db.Uuid
+  usesGlasses       Boolean           @default(false)
+  usesContactLenses Boolean           @default(false)
+  farRight          Decimal?          @db.Decimal(3, 2)
+  farLeft           Decimal?          @db.Decimal(3, 2)
+  farRightCorrected Decimal?          @db.Decimal(3, 2)
+  farLeftCorrected  Decimal?          @db.Decimal(3, 2)
+  nearRight         Int?
+  nearLeft          Int?
+  ishiharaCorrect   Int?
+  ishiharaTotal     Int?
+  /// Given directly when plates were not counted (e.g. another test method).
+  colorVision       ColorVisionResult @default(NOT_TESTED)
+  visualField       VisualFieldResult @default(NOT_TESTED)
+  /// External eye / other findings - medical data.
+  findings          String?
+  recommendation    EyeRecommendation @default(NONE)
+  comment           String?
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+  deletedAt         DateTime?
+
+  tenant      Tenant    @relation(fields: [tenantId], references: [id])
+  employee    Employee  @relation(fields: [employeeId], references: [id])
+  protocol    Protocol? @relation(fields: [protocolId], references: [id])
+  performedBy User?     @relation("EyePerformer", fields: [performedById], references: [id])
+
+  @@index([tenantId, employeeId, performedAt])
+  @@index([tenantId, performedAt])
+  @@map("eye_examinations")
+}
+
+enum PneumoconiosisResult {
+  NEGATIVE
+  BORDERLINE
+  POSITIVE
+}
+
+/// ILO 2011 reading of a chest radiograph (Pnömokonyoz). Several readings may exist for one film
+/// (reader A / B). Codes follow the shared PROFUSIONS / OPACITY_SHAPES / ILO_SYMBOLS catalogues.
+model PneumoconiosisReading {
+  id                       String               @id @default(uuid()) @db.Uuid
+  tenantId                 String               @db.Uuid
+  employeeId               String               @db.Uuid
+  protocolId               String?              @db.Uuid
+  radiologyRequestId       String?              @db.Uuid
+  readAt                   DateTime             @default(now())
+  readerId                 String?              @db.Uuid
+  /// e.g. "A okuyucu", "B okuyucu", "NIOSH B reader".
+  readerRole               String?
+  filmDate                 DateTime?            @db.Date
+  filmQuality              Int?
+  qualityComment           String?
+  profusion                String?
+  shapePrimary             String?
+  shapeSecondary           String?
+  zones                    String[]             @default([])
+  largeOpacity             String               @default("0")
+  pleuralPlaques           Boolean              @default(false)
+  plaqueCalcification      Boolean              @default(false)
+  diffuseThickening        Boolean              @default(false)
+  costophrenicObliteration String[]             @default([])
+  symbols                  String[]             @default([])
+  result                   PneumoconiosisResult @default(NEGATIVE)
+  /// Reader comment - medical data.
+  comment                  String?
+  createdAt                DateTime             @default(now())
+  updatedAt                DateTime             @updatedAt
+  deletedAt                DateTime?
+
+  tenant           Tenant            @relation(fields: [tenantId], references: [id])
+  employee         Employee          @relation(fields: [employeeId], references: [id])
+  protocol         Protocol?         @relation(fields: [protocolId], references: [id])
+  radiologyRequest RadiologyRequest? @relation(fields: [radiologyRequestId], references: [id])
+  reader           User?             @relation("PneumoReader", fields: [readerId], references: [id])
+
+  @@index([tenantId, employeeId, readAt])
+  @@index([tenantId, readAt])
+  @@map("pneumoconiosis_readings")
+}
+
+/// Pure-tone audiometry test (Odyometri). Thresholds are JSON maps `{ "500": 10, … }` in dB HL;
+/// the four-frequency averages are stored for listing/filtering, everything else is derived.
+model AudiometryTest {
+  id            String    @id @default(uuid()) @db.Uuid
+  tenantId      String    @db.Uuid
+  employeeId    String    @db.Uuid
+  protocolId    String?   @db.Uuid
+  performedAt   DateTime  @default(now())
+  performedById String?   @db.Uuid
+  deviceName    String?
+  /// Reference test for later threshold-shift comparisons.
+  isBaseline    Boolean   @default(false)
+  /// Hours without noise exposure before the test (≥14 h recommended for a baseline).
+  quietHours    Int?
+  airRight      Json
+  airLeft       Json
+  boneRight     Json?
+  boneLeft      Json?
+  ptaRight      Decimal?  @db.Decimal(5, 1)
+  ptaLeft       Decimal?  @db.Decimal(5, 1)
+  notes         String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  deletedAt     DateTime?
+
+  tenant      Tenant    @relation(fields: [tenantId], references: [id])
+  employee    Employee  @relation(fields: [employeeId], references: [id])
+  protocol    Protocol? @relation(fields: [protocolId], references: [id])
+  performedBy User?     @relation("AudiometryPerformer", fields: [performedById], references: [id])
+
+  @@index([tenantId, employeeId, performedAt])
+  @@index([tenantId, performedAt])
+  @@map("audiometry_tests")
+}
+
+/// Structured value recorded on an examination (boy, kilo, tansiyon, FEV1 …). Keys come from the
+/// shared MEASUREMENT_DEFINITIONS catalogue; Muayene Karşılaştırma compares them across visits.
+model ExaminationMeasurement {
+  id            String   @id @default(uuid()) @db.Uuid
+  tenantId      String   @db.Uuid
+  examinationId String   @db.Uuid
+  key           String
+  value         Decimal  @db.Decimal(10, 2)
+  note          String?
+  recordedAt    DateTime @default(now())
+  recordedById  String?  @db.Uuid
+
+  tenant      Tenant      @relation(fields: [tenantId], references: [id])
+  examination Examination @relation(fields: [examinationId], references: [id], onDelete: Cascade)
+  recordedBy  User?       @relation("MeasurementRecorder", fields: [recordedById], references: [id])
+
+  @@unique([examinationId, key])
+  @@index([tenantId, examinationId])
+  @@map("examination_measurements")
+}
+
+/// Doktor Tanımları: physicians who examine, report and sign. Optionally linked to a login user.
+model Physician {
+  id                        String          @id @default(uuid()) @db.Uuid
+  tenantId                  String          @db.Uuid
+  /// Login account of the physician (one account ↔ one physician).
+  userId                    String?         @unique @db.Uuid
+  /// Academic/professional title shown before the name (Dr., Uzm. Dr., Doç. Dr. …).
+  title                     String?
+  firstName                 String
+  lastName                  String
+  /// Branch/specialty, free text chosen from a suggested list (İşyeri Hekimi, Radyoloji …).
+  specialty                 String?
+  diplomaNumber             String?
+  /// Diploma tescil no (Sağlık Bakanlığı).
+  diplomaRegistrationNumber String?
+  /// İşyeri hekimliği belgesi no.
+  certificateNumber         String?
+  phone                     String?
+  email                     String?
+  /// Signature image printed on reports (PNG in MinIO).
+  signatureKey              String?
+  signatureUpdatedAt        DateTime?
+  status                    PhysicianStatus @default(ACTIVE)
+  notes                     String?
+  createdAt                 DateTime        @default(now())
+  updatedAt                 DateTime        @updatedAt
+  deletedAt                 DateTime?
+
+  tenant             Tenant        @relation(fields: [tenantId], references: [id])
+  signedExaminations Examination[] @relation("ExaminationPhysicianProfile")
+  user               User?         @relation(fields: [userId], references: [id])
+
+  @@index([tenantId, status])
+  @@index([tenantId, lastName, firstName])
+  @@map("physicians")
+}
+
+/// Tetkik Tanımları: the OSGB's catalogue of tests/services with list prices.
+model TestDefinition {
+  id              String       @id @default(uuid()) @db.Uuid
+  tenantId        String       @db.Uuid
+  /// Short unique code per tenant (e.g. LAB-HGB, RAD-PA).
+  code            String
+  name            String
+  category        TestCategory
+  /// List price without VAT, TRY.
+  unitPrice       Decimal      @default(0) @db.Decimal(10, 2)
+  /// VAT percentage (0, 10, 20).
+  vatRate         Int          @default(20)
+  /// Typical duration for scheduling, minutes.
+  durationMinutes Int?
+  /// LAB only: sample type (kan, idrar …).
+  sampleType      String?
+  /// LAB only: reference range shown next to results.
+  referenceRange  String?
+  unit            String?
+  isActive        Boolean      @default(true)
+  sortOrder       Int          @default(0)
+  notes           String?
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+  deletedAt       DateTime?
+
+  tenant       Tenant            @relation(fields: [tenantId], references: [id])
+  packageItems TestPackageItem[]
+
+  @@index([tenantId, category, isActive])
+  @@index([tenantId, code])
+  @@map("test_definitions")
+}
+
+/// Tetkik Paketleri: a named bundle of catalogue tests (e.g. "İşe Giriş Standart").
+model TestPackage {
+  id          String    @id @default(uuid()) @db.Uuid
+  tenantId    String    @db.Uuid
+  code        String
+  name        String
+  description String?
+  /// Package price without VAT; null = sum of the items' list prices.
+  price       Decimal?  @db.Decimal(10, 2)
+  vatRate     Int       @default(20)
+  isActive    Boolean   @default(true)
+  sortOrder   Int       @default(0)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  deletedAt   DateTime?
+
+  tenant Tenant            @relation(fields: [tenantId], references: [id])
+  items  TestPackageItem[]
+
+  @@index([tenantId, isActive])
+  @@index([tenantId, code])
+  @@map("test_packages")
+}
+
+model TestPackageItem {
+  id         String @id @default(uuid()) @db.Uuid
+  packageId  String @db.Uuid
+  testId     String @db.Uuid
+  quantity   Int    @default(1)
+  orderIndex Int    @default(0)
+
+  package TestPackage    @relation(fields: [packageId], references: [id], onDelete: Cascade)
+  test    TestDefinition @relation(fields: [testId], references: [id])
+
+  @@unique([packageId, testId])
+  @@index([testId])
+  @@map("test_package_items")
+}
+
+/// Meslek Tanımları: occupations assigned to patients (drives periodic-exam and hazard rules later).
+model Occupation {
+  id          String    @id @default(uuid()) @db.Uuid
+  tenantId    String    @db.Uuid
+  /// Optional classification code (ISCO-08 / SGK meslek kodu), unique per tenant when set.
+  code        String?
+  name        String
+  /// Turkish-aware lower-cased name (İ→i, I→ı) for duplicate checks; Postgres lower() cannot fold these.
+  nameKey     String
+  description String?
+  isActive    Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  deletedAt   DateTime?
+
+  tenant    Tenant     @relation(fields: [tenantId], references: [id])
+  employees Employee[]
+
+  @@index([tenantId, isActive, name])
+  @@index([tenantId, nameKey])
+  @@map("occupations")
+}
+
+/// KVKK consent text. Versions are immutable (legal proof); a new version supersedes the old one.
+model ConsentTemplate {
+  id            String      @id @default(uuid()) @db.Uuid
+  tenantId      String      @db.Uuid
+  type          ConsentType
+  version       Int
+  title         String
+  /// Plain text / Markdown shown to the patient and printed on the signed form.
+  body          String
+  /// Version in force from this date; the newest active version per type is the one offered.
+  effectiveFrom DateTime    @default(now())
+  isActive      Boolean     @default(true)
+  createdById   String?     @db.Uuid
+  createdAt     DateTime    @default(now())
+
+  tenant   Tenant           @relation(fields: [tenantId], references: [id])
+  consents PatientConsent[]
+
+  @@unique([tenantId, type, version])
+  @@index([tenantId, type, isActive])
+  @@map("consent_templates")
+}
+
+/// A patient's consent (or acknowledgement) to a specific template version.
+model PatientConsent {
+  id             String        @id @default(uuid()) @db.Uuid
+  tenantId       String        @db.Uuid
+  employeeId     String        @db.Uuid
+  templateId     String        @db.Uuid
+  status         ConsentStatus @default(GIVEN)
+  method         ConsentMethod
+  givenAt        DateTime      @default(now())
+  withdrawnAt    DateTime?
+  withdrawReason String?
+  collectedById  String?       @db.Uuid
+  /// Signed form (Belge İmza) once available.
+  documentId     String?       @db.Uuid
+  note           String?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  tenant      Tenant             @relation(fields: [tenantId], references: [id])
+  employee    Employee           @relation(fields: [employeeId], references: [id])
+  template    ConsentTemplate    @relation(fields: [templateId], references: [id])
+  collectedBy User?              @relation("ConsentCollector", fields: [collectedById], references: [id])
+  signature   DocumentSignature?
+
+  @@index([tenantId, employeeId])
+  @@index([tenantId, status])
+  @@map("patient_consents")
+}
+
+/// Belge İmza: proof record for a PDF the patient signed on the signature pad (or a stamped upload).
+model DocumentSignature {
+  id            String   @id @default(uuid()) @db.Uuid
+  tenantId      String   @db.Uuid
+  documentId    String   @unique @db.Uuid
+  employeeId    String   @db.Uuid
+  /// Set when the signed form is a KVKK consent text.
+  consentId     String?  @unique @db.Uuid
+  title         String
+  signerName    String
+  signedAt      DateTime @default(now())
+  collectedById String?  @db.Uuid
+  /// Trimmed PNG of the raw signature, kept separately from the PDF.
+  signatureKey  String
+  /// SHA-256 of the stored PDF bytes; `verify` re-hashes the object to detect tampering.
+  sha256        String
+  ipAddress     String?
+  userAgent     String?
+  createdAt     DateTime @default(now())
+
+  tenant      Tenant          @relation(fields: [tenantId], references: [id])
+  document    Document        @relation(fields: [documentId], references: [id])
+  employee    Employee        @relation(fields: [employeeId], references: [id])
+  consent     PatientConsent? @relation(fields: [consentId], references: [id])
+  collectedBy User?           @relation("SignatureCollector", fields: [collectedById], references: [id])
+
+  @@index([tenantId, employeeId])
+  @@index([tenantId, signedAt])
+  @@map("document_signatures")
+}
+
+/// Kurum Bilgileri: the OSGB's own legal/contact identity (one row per tenant), printed on reports.
+model OrganizationProfile {
+  id                    String    @id @default(uuid()) @db.Uuid
+  tenantId              String    @unique @db.Uuid
+  /// Registered legal title (ticari ünvan); Tenant.name stays the short display name.
+  legalName             String?
+  taxOffice             String?
+  taxNumber             String?
+  sgkRegistrationNumber String?
+  /// Bakanlık OSGB yetki belgesi numarası ve tarihi.
+  authorizationNumber   String?
+  authorizationDate     DateTime? @db.Date
+  responsibleManager    String?
+  phone                 String?
+  fax                   String?
+  email                 String?
+  website               String?
+  addressProvinceId     Int?
+  addressDistrictId     Int?
+  addressLine           String?
+  /// Free text printed at the bottom of reports (e.g. bank details, disclaimers).
+  reportFooter          String?
+  logoKey               String?
+  logoUpdatedAt         DateTime?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  tenant          Tenant    @relation(fields: [tenantId], references: [id])
+  addressProvince Province? @relation(fields: [addressProvinceId], references: [id])
+  addressDistrict District? @relation(fields: [addressDistrictId], references: [id])
+
+  @@map("organization_profiles")
+}
+
+/// A visit (Protokol): one patient, one reason, a set of ordered tests. The backbone the doctor
+/// modules attach to. Numbered per tenant and year (e.g. 2026-000123) via ProtocolCounter.
+model Protocol {
+  id             String          @id @default(uuid()) @db.Uuid
+  tenantId       String          @db.Uuid
+  /// Human-readable, unique per tenant: `<year>-<6 digit sequence>`.
+  protocolNumber String
+  year           Int
+  sequence       Int
+  employeeId     String          @db.Uuid
+  /// Workplace at the time of the visit (copied from the employee, editable).
+  companyId      String?         @db.Uuid
+  type           ExaminationType
+  status         ProtocolStatus  @default(OPEN)
+  openedAt       DateTime        @default(now())
+  closedAt       DateTime?
+  openedById     String          @db.Uuid
+  closedById     String?         @db.Uuid
+  /// Free text reason / remarks (not medical findings).
+  notes          String?
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  deletedAt      DateTime?
+
+  tenant                 Tenant                  @relation(fields: [tenantId], references: [id])
+  employee               Employee                @relation(fields: [employeeId], references: [id])
+  company                Company?                @relation(fields: [companyId], references: [id])
+  openedBy               User                    @relation("ProtocolOpener", fields: [openedById], references: [id])
+  closedBy               User?                   @relation("ProtocolCloser", fields: [closedById], references: [id])
+  items                  ProtocolItem[]
+  examinations           Examination[]
+  audiometryTests        AudiometryTest[]
+  ecgRecords             EcgRecord[]
+  spirometryTests        SpirometryTest[]
+  eyeExaminations        EyeExamination[]
+  pneumoconiosisReadings PneumoconiosisReading[]
+
+  @@unique([tenantId, protocolNumber])
+  @@index([tenantId, status])
+  @@index([tenantId, employeeId])
+  @@index([tenantId, openedAt])
+  @@map("protocols")
+}
+
+/// One ordered test / output on a protocol.
+model ProtocolItem {
+  id          String             @id @default(uuid()) @db.Uuid
+  tenantId    String             @db.Uuid
+  protocolId  String             @db.Uuid
+  type        ProtocolItemType
+  status      ProtocolItemStatus @default(PENDING)
+  /// Short outcome note entered when the item is completed (not the medical report itself).
+  note        String?
+  completedAt DateTime?
+  orderIndex  Int                @default(0)
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
+
+  protocol Protocol @relation(fields: [protocolId], references: [id], onDelete: Cascade)
+
+  @@unique([protocolId, type])
+  @@index([tenantId, type, status])
+  @@map("protocol_items")
+}
+
+/// Per-tenant, per-year sequence for protocol numbers (row updated inside the create transaction).
+model ProtocolCounter {
+  tenantId String @db.Uuid
+  year     Int
+  last     Int    @default(0)
+
+  @@id([tenantId, year])
+  @@map("protocol_counters")
 }
 
 /// Reference to a DICOM study stored in Orthanc. No pixel data is stored here.
@@ -516,10 +1240,11 @@ model RadiologyRequest {
   updatedAt        DateTime               @updatedAt
   deletedAt        DateTime?
 
-  tenant       Tenant        @relation(fields: [tenantId], references: [id])
-  employee     Employee      @relation(fields: [employeeId], references: [id])
-  examination  Examination?  @relation(fields: [examinationId], references: [id])
-  appointments Appointment[]
+  tenant                 Tenant                  @relation(fields: [tenantId], references: [id])
+  employee               Employee                @relation(fields: [employeeId], references: [id])
+  examination            Examination?            @relation(fields: [examinationId], references: [id])
+  appointments           Appointment[]
+  pneumoconiosisReadings PneumoconiosisReading[]
 
   @@index([tenantId])
   @@index([tenantId, employeeId])
@@ -551,11 +1276,15 @@ model Document {
   updatedAt     DateTime         @updatedAt
   deletedAt     DateTime?
 
-  tenant      Tenant       @relation(fields: [tenantId], references: [id])
-  employee    Employee?    @relation(fields: [employeeId], references: [id])
-  company     Company?     @relation(fields: [companyId], references: [id])
-  examination Examination? @relation(fields: [examinationId], references: [id])
-  uploadedBy  User?        @relation("DocumentUploader", fields: [uploadedById], references: [id])
+  tenant            Tenant             @relation(fields: [tenantId], references: [id])
+  employee          Employee?          @relation(fields: [employeeId], references: [id])
+  company           Company?           @relation(fields: [companyId], references: [id])
+  examination       Examination?       @relation(fields: [examinationId], references: [id])
+  uploadedBy        User?              @relation("DocumentUploader", fields: [uploadedById], references: [id])
+  signature         DocumentSignature?
+  ecgRecord         EcgRecord?
+  spirometryTest    SpirometryTest?
+  examinationReport Examination?       @relation("ExaminationReport")
 
   @@index([tenantId])
   @@index([tenantId, employeeId])

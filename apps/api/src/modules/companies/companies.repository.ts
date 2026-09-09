@@ -14,7 +14,15 @@ export class CompaniesRepository {
     const where: Prisma.CompanyWhereInput = {
       tenantId,
       deletedAt: null,
-      ...(search ? { name: { contains: search, mode: 'insensitive' } } : {}),
+      ...(search
+        ? {
+            OR: [
+              { name: { contains: search, mode: 'insensitive' } },
+              { taxNumber: { startsWith: search } },
+              { sgkRegistrationNumber: { startsWith: search } },
+            ],
+          }
+        : {}),
     };
     return this.prisma.$transaction([
       this.prisma.company.findMany({

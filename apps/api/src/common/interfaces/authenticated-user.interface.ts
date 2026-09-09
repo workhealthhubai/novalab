@@ -13,12 +13,16 @@ export interface AuthenticatedUser {
   status: UserStatus;
   roles: string[];
   permissions: Permission[];
+  /** Refresh session behind this access token (present on tokens issued after sessions were added). */
+  sessionId?: string;
 }
 
 export interface AccessTokenPayload {
   sub: string;
   tid: string;
   email: string;
+  /** Refresh session id, so "current session" can be recognised in session lists. */
+  sid?: string;
   type: 'access';
   iat?: number;
   exp?: number;

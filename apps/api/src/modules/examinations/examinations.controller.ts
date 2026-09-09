@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Patch, Post, Query, Req } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, Post, Put, Query, Req } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { PERMISSIONS } from '@osgb/shared-types';
 import { CurrentTenant, CurrentUser, MedicalData, RequirePermissions } from '@/common/decorators';
@@ -10,6 +10,7 @@ import {
 } from '@/common/interfaces';
 import { CreateExaminationDto } from './dto/create-examination.dto';
 import { ExaminationQueryDto } from './dto/examination-query.dto';
+import { CompareQueryDto, SetMeasurementsDto, TimelineQueryDto } from './dto/measurement.dtos';
 import { UpdateExaminationDto } from './dto/update-examination.dto';
 import { ExaminationsService } from './examinations.service';
 
@@ -28,6 +29,22 @@ export class ExaminationsController {
   @RequirePermissions(PERMISSIONS.EXAMINATIONS_READ)
   list(@CurrentTenant() tenantId: string, @Query() query: ExaminationQueryDto) {
     return this.examinations.list(tenantId, query);
+  }
+
+  @Get('timeline')
+  @RequirePermissions(PERMISSIONS.EXAMINATIONS_READ)
+  @ApiOperation({ summary: "A patient's examinations for selection (no clinical text)" })
+  timeline(@CurrentTenant() tenantId: string, @Query() query: TimelineQueryDto) {
+    return this.examinations.timeline(tenantId, query.employeeId);
+  }
+
+  @Get('compare')
+  @RequirePermissions(PERMISSIONS.EXAMINATIONS_READ)
+  @ApiOperation({
+    summary: 'Muayene Karşılaştırma: selected examinations side by side with measurements',
+  })
+  compare(@CurrentTenant() tenantId: string, @Query() query: CompareQueryDto) {
+    return this.examinations.compare(tenantId, query);
   }
 
   @Get(':id')
@@ -57,6 +74,19 @@ export class ExaminationsController {
     @Req() req: RequestWithUser,
   ) {
     return this.examinations.update(tenantId, actor, id, dto, extractRequestContext(req));
+  }
+
+  @Put(':id/measurements')
+  @RequirePermissions(PERMISSIONS.EXAMINATIONS_UPDATE)
+  @ApiOperation({ summary: 'Replace the structured measurements of an examination' })
+  setMeasurements(
+    @CurrentTenant() tenantId: string,
+    @CurrentUser() actor: AuthenticatedUser,
+    @Param() { id }: IdParamDto,
+    @Body() dto: SetMeasurementsDto,
+    @Req() req: RequestWithUser,
+  ) {
+    return this.examinations.setMeasurements(tenantId, actor, id, dto, extractRequestContext(req));
   }
 
   @Post(':id/approve')

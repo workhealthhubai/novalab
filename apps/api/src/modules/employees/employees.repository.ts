@@ -18,6 +18,7 @@ export const employeeDetailInclude = {
   company: { select: { id: true, name: true } },
   branch: { select: { id: true, name: true } },
   workplace: { select: { id: true, name: true } },
+  occupation: { select: { id: true, name: true, code: true } },
   addressProvince: { select: { id: true, name: true } },
   addressDistrict: { select: { id: true, name: true } },
   addressNeighborhood: { select: { id: true, name: true } },

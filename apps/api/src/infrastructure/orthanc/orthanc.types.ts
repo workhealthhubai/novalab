@@ -28,6 +28,13 @@ export interface OrthancStudy {
   PatientMainDicomTags: Record<string, string> & {
     PatientID?: string;
     PatientName?: string;
+    PatientBirthDate?: string;
+  };
+  /** Present when the find query asked for computed tags. */
+  RequestedTags?: Record<string, string> & {
+    ModalitiesInStudy?: string;
+    NumberOfStudyRelatedSeries?: string;
+    NumberOfStudyRelatedInstances?: string;
   };
 }
 
@@ -47,4 +54,7 @@ export interface OrthancFindQuery {
   Query: Record<string, string>;
   Expand?: boolean;
   Limit?: number;
+  /** Orthanc ≥ 1.12.5 (extended find). */
+  OrderBy?: Array<{ Type: 'DicomTag' | 'Metadata'; Key: string; Direction: 'ASC' | 'DESC' }>;
+  RequestedTags?: string[];
 }

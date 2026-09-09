@@ -58,6 +58,27 @@ export class OrthancService {
     return results[0] ?? null;
   }
 
+  /**
+   * Study-level find with the computed tags the UI shows (modalities, series/instance counts),
+   * newest study first. Orthanc refuses wildcards on StudyInstanceUID, so "all studies" is
+   * expressed as an empty StudyDate constraint.
+   */
+  async findStudies(query: Record<string, string>, limit = 25): Promise<OrthancStudy[]> {
+    const body: OrthancFindQuery = {
+      Level: 'Study',
+      Query: Object.keys(query).length > 0 ? query : { StudyDate: '' },
+      Expand: true,
+      Limit: limit,
+      OrderBy: [{ Type: 'DicomTag', Key: 'StudyDate', Direction: 'DESC' }],
+      RequestedTags: [
+        'ModalitiesInStudy',
+        'NumberOfStudyRelatedSeries',
+        'NumberOfStudyRelatedInstances',
+      ],
+    };
+    return this.request<OrthancStudy[]>('POST', '/tools/find', body);
+  }
+
   async getStudyInstances(orthancStudyId: string): Promise<OrthancInstance[]> {
     return this.request<OrthancInstance[]>(
       'GET',

@@ -20,18 +20,35 @@ import { AuthModule } from '@/modules/auth/auth.module';
 import { BranchesModule } from '@/modules/branches/branches.module';
 import { CertificatesModule } from '@/modules/certificates/certificates.module';
 import { CompaniesModule } from '@/modules/companies/companies.module';
+import { AudiometryModule } from '@/modules/audiometry/audiometry.module';
+import { CompanyImportsModule } from '@/modules/company-imports/company-imports.module';
+import { ConsentsModule } from '@/modules/consents/consents.module';
 import { DocumentsModule } from '@/modules/documents/documents.module';
+import { EcgModule } from '@/modules/ecg/ecg.module';
+import { EyeModule } from '@/modules/eye/eye.module';
+import { EmployeeImportsModule } from '@/modules/employee-imports/employee-imports.module';
 import { EmployeesModule } from '@/modules/employees/employees.module';
 import { ExaminationsModule } from '@/modules/examinations/examinations.module';
+import { HealthReportsModule } from '@/modules/health-reports/health-reports.module';
 import { HealthModule } from '@/modules/health/health.module';
 import { IdentityModule } from '@/modules/identity/identity.module';
 import { LocationsModule } from '@/modules/locations/locations.module';
 import { NotificationsModule } from '@/modules/notifications/notifications.module';
+import { OccupationsModule } from '@/modules/occupations/occupations.module';
+import { OrganizationModule } from '@/modules/organization/organization.module';
 import { PermissionsModule } from '@/modules/permissions/permissions.module';
+import { PneumoconiosisModule } from '@/modules/pneumoconiosis/pneumoconiosis.module';
+import { PhysiciansModule } from '@/modules/physicians/physicians.module';
+import { ProtocolsModule } from '@/modules/protocols/protocols.module';
 import { RadiologyModule } from '@/modules/radiology/radiology.module';
 import { RolesModule } from '@/modules/roles/roles.module';
+import { SpirometryModule } from '@/modules/spirometry/spirometry.module';
+import { SignaturesModule } from '@/modules/signatures/signatures.module';
+import { SessionsModule } from '@/modules/sessions/sessions.module';
 import { SystemModule } from '@/modules/system/system.module';
 import { TenantsModule } from '@/modules/tenants/tenants.module';
+import { TestPackagesModule } from '@/modules/test-packages/test-packages.module';
+import { TestsModule } from '@/modules/tests/tests.module';
 import { TrainingsModule } from '@/modules/trainings/trainings.module';
 import { UsersModule } from '@/modules/users/users.module';
 import { WorkplacesModule } from '@/modules/workplaces/workplaces.module';
@@ -76,6 +93,7 @@ import { WorkplacesModule } from '@/modules/workplaces/workplaces.module';
     AuthModule,
     UsersModule,
     TenantsModule,
+    OrganizationModule,
     RolesModule,
     PermissionsModule,
 
@@ -84,9 +102,25 @@ import { WorkplacesModule } from '@/modules/workplaces/workplaces.module';
     BranchesModule,
     WorkplacesModule,
     EmployeesModule,
+    EmployeeImportsModule,
+    CompanyImportsModule,
     LocationsModule,
     IdentityModule,
     ExaminationsModule,
+    ProtocolsModule,
+    PhysiciansModule,
+    TestsModule,
+    TestPackagesModule,
+    OccupationsModule,
+    SessionsModule,
+    ConsentsModule,
+    SignaturesModule,
+    AudiometryModule,
+    EcgModule,
+    SpirometryModule,
+    EyeModule,
+    PneumoconiosisModule,
+    HealthReportsModule,
     RadiologyModule,
     AppointmentsModule,
     TrainingsModule,

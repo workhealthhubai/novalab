@@ -35,7 +35,16 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
       { emit: 'event', level: 'warn' },
       ...(logSql ? [{ emit: 'event' as const, level: 'query' as const }] : []),
     ];
-    super({ adapter, omit: { user: { passwordHash: true }, employee: { photoKey: true } }, log });
+    super({
+      adapter,
+      omit: {
+        user: { passwordHash: true },
+        employee: { photoKey: true },
+        organizationProfile: { logoKey: true },
+        physician: { signatureKey: true },
+      },
+      log,
+    });
     this.logger.setContext(PrismaService.name);
 
     const events = this as unknown as PrismaLogEvents;

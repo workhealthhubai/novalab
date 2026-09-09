@@ -1,7 +1,19 @@
-import { Body, Controller, Get, Param, Patch, Post, Put, Query, Req } from '@nestjs/common';
-import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
+import {
+  Body,
+  Controller,
+  Get,
+  HttpCode,
+  HttpStatus,
+  Param,
+  Patch,
+  Post,
+  Put,
+  Query,
+  Req,
+} from '@nestjs/common';
+import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { PERMISSIONS } from '@osgb/shared-types';
-import { CurrentTenant, CurrentUser, RequirePermissions } from '@/common/decorators';
+import { CurrentTenant, CurrentUser, RequirePermissions, SkipAudit } from '@/common/decorators';
 import { IdParamDto } from '@/common/dto/id-param.dto';
 import {
   type AuthenticatedUser,
@@ -10,6 +22,7 @@ import {
 } from '@/common/interfaces';
 import { AssignRolesDto } from './dto/assign-roles.dto';
 import { CreateUserDto } from './dto/create-user.dto';
+import { SetPasswordDto } from './dto/set-password.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { UserQueryDto } from './dto/user-query.dto';
 import { UsersService } from './users.service';
@@ -53,6 +66,21 @@ export class UsersController {
     @Req() req: RequestWithUser,
   ) {
     return this.users.update(tenantId, actor, id, dto, extractRequestContext(req));
+  }
+
+  @Put(':id/password')
+  @HttpCode(HttpStatus.OK)
+  @RequirePermissions(PERMISSIONS.USERS_UPDATE)
+  @SkipAudit()
+  @ApiOperation({ summary: 'Set a new (temporary) password and revoke all sessions of the user' })
+  setPassword(
+    @CurrentTenant() tenantId: string,
+    @CurrentUser() actor: AuthenticatedUser,
+    @Param() { id }: IdParamDto,
+    @Body() dto: SetPasswordDto,
+    @Req() req: RequestWithUser,
+  ) {
+    return this.users.setPassword(tenantId, actor, id, dto, extractRequestContext(req));
   }
 
   @Put(':id/roles')

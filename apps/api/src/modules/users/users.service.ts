@@ -7,6 +7,7 @@ import type { User } from '@/generated/prisma/client';
 import { AuditService } from '@/modules/audit/audit.service';
 import type { AssignRolesDto } from './dto/assign-roles.dto';
 import type { CreateUserDto } from './dto/create-user.dto';
+import type { SetPasswordDto } from './dto/set-password.dto';
 import type { UpdateUserDto } from './dto/update-user.dto';
 import type { UserQueryDto } from './dto/user-query.dto';
 import { UsersRepository, type UserWithAccess } from './users.repository';
@@ -108,12 +109,19 @@ export class UsersService {
     ctx: RequestContext,
   ) {
     const before = await this.get(tenantId, id);
+    if (id === actor.id && dto.status !== undefined && dto.status !== 'ACTIVE') {
+      throw new BadRequestException({
+        message: 'You cannot deactivate your own account',
+        errorCode: 'CANNOT_CHANGE_OWN_STATUS',
+      });
+    }
     const updated = await this.users.update(tenantId, id, {
       ...(dto.email !== undefined ? { email: dto.email.toLowerCase() } : {}),
       ...(dto.firstName !== undefined ? { firstName: dto.firstName } : {}),
       ...(dto.lastName !== undefined ? { lastName: dto.lastName } : {}),
       ...(dto.status !== undefined ? { status: dto.status } : {}),
     });
+    if (dto.status !== undefined && dto.status !== 'ACTIVE') await this.users.revokeSessions(id);
     await this.audit.log({
       tenantId,
       userId: actor.id,
@@ -130,6 +138,30 @@ export class UsersService {
       ...ctx,
     });
     return updated;
+  }
+
+  /** Admin password reset: stores the new hash and signs the user out everywhere. */
+  async setPassword(
+    tenantId: string,
+    actor: AuthenticatedUser,
+    id: string,
+    dto: SetPasswordDto,
+    ctx: RequestContext,
+  ): Promise<{ revokedSessions: number }> {
+    await this.get(tenantId, id);
+    const passwordHash = await hashPassword(dto.password);
+    await this.users.update(tenantId, id, { passwordHash });
+    const revokedSessions = await this.users.revokeSessions(id);
+    await this.audit.log({
+      tenantId,
+      userId: actor.id,
+      action: AuditAction.UPDATE,
+      entityType: 'User',
+      entityId: id,
+      newValue: { passwordReset: true, revokedSessions },
+      ...ctx,
+    });
+    return { revokedSessions };
   }
 
   async assignRoles(

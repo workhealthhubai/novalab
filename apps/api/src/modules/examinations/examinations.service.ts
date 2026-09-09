@@ -1,5 +1,8 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
-import { AuditAction } from '@osgb/shared-types';
+import { AuditAction, measurementDefinition } from '@osgb/shared-types';
+import { PrismaService } from '@/infrastructure/prisma/prisma.service';
+import { examinationDate, presentKeys, toMeasurementMap } from './examination-comparison';
+import type { CompareQueryDto, SetMeasurementsDto } from './dto/measurement.dtos';
 import type { AuthenticatedUser, RequestContext } from '@/common/interfaces';
 import { paginate, toSkipTake } from '@/common/utils/pagination';
 import { AuditService } from '@/modules/audit/audit.service';
@@ -19,6 +22,7 @@ export class ExaminationsService {
     private readonly examinations: ExaminationsRepository,
     private readonly employees: EmployeesRepository,
     private readonly audit: AuditService,
+    private readonly prisma: PrismaService,
   ) {}
 
   async list(tenantId: string, query: ExaminationQueryDto) {
@@ -101,6 +105,138 @@ export class ExaminationsService {
       ...ctx,
     });
     return examination;
+  }
+
+  /** All examinations of a patient, newest first, with the measurement count (no clinical text). */
+  async timeline(tenantId: string, employeeId: string) {
+    const rows = await this.prisma.examination.findMany({
+      where: { tenantId, employeeId, deletedAt: null },
+      select: {
+        id: true,
+        type: true,
+        status: true,
+        scheduledAt: true,
+        performedAt: true,
+        createdAt: true,
+        fitnessDecision: true,
+        nextExaminationDue: true,
+        protocol: { select: { id: true, protocolNumber: true } },
+        physician: { select: { id: true, firstName: true, lastName: true } },
+        _count: { select: { measurements: true } },
+      },
+    });
+    return rows
+      .map((row) => ({ ...row, date: examinationDate(row) }))
+      .sort((a, b) => b.date.getTime() - a.date.getTime());
+  }
+
+  /** Side-by-side data for Muayene Karşılaştırma: selected (or latest three) examinations, oldest first. */
+  async compare(tenantId: string, query: CompareQueryDto) {
+    const employee = await this.prisma.employee.findFirst({
+      where: { id: query.employeeId, tenantId, deletedAt: null },
+      select: { id: true, firstName: true, lastName: true, nationalId: true, birthDate: true },
+    });
+    if (!employee)
+      throw new NotFoundException({
+        message: 'Employee not found',
+        errorCode: 'EMPLOYEE_NOT_FOUND',
+      });
+    const rows = await this.prisma.examination.findMany({
+      where: {
+        tenantId,
+        employeeId: employee.id,
+        deletedAt: null,
+        ...(query.ids ? { id: { in: query.ids } } : {}),
+      },
+      include: {
+        protocol: {
+          select: {
+            id: true,
+            protocolNumber: true,
+            items: { select: { type: true, status: true }, orderBy: { orderIndex: 'asc' } },
+          },
+        },
+        physician: { select: { id: true, firstName: true, lastName: true } },
+        approvedBy: { select: { id: true, firstName: true, lastName: true } },
+        measurements: { select: { key: true, value: true, note: true, recordedAt: true } },
+      },
+    });
+    if (query.ids && rows.length !== query.ids.length)
+      throw new NotFoundException({
+        message: 'One or more examinations were not found for this patient',
+        errorCode: 'EXAMINATION_NOT_FOUND',
+      });
+    const sorted = rows
+      .map((row) => ({ ...row, date: examinationDate(row) }))
+      .sort((a, b) => a.date.getTime() - b.date.getTime());
+    const selected = query.ids ? sorted : sorted.slice(-3);
+    const examinations = selected.map(({ measurements, ...row }) => ({
+      ...row,
+      measurements: toMeasurementMap(measurements),
+    }));
+    return { employee, examinations, keys: presentKeys(examinations.map((e) => e.measurements)) };
+  }
+
+  /** Replaces the structured measurements of an examination (approved ones are read-only). */
+  async setMeasurements(
+    tenantId: string,
+    actor: AuthenticatedUser,
+    id: string,
+    dto: SetMeasurementsDto,
+    ctx: RequestContext,
+  ) {
+    const before = await this.get(tenantId, id);
+    if (before.status === 'APPROVED')
+      throw new BadRequestException({
+        message: 'Approved examinations are read-only',
+        errorCode: 'EXAMINATION_LOCKED',
+      });
+    const seen = new Set<string>();
+    for (const m of dto.measurements) {
+      const def = measurementDefinition(m.key);
+      if (!def || def.derived || seen.has(m.key) || m.value < def.min || m.value > def.max)
+        throw new BadRequestException({
+          message: `Invalid measurement: ${m.key}`,
+          errorCode: 'MEASUREMENT_INVALID',
+        });
+      seen.add(m.key);
+    }
+    const now = new Date();
+    await this.prisma.$transaction([
+      this.prisma.examinationMeasurement.deleteMany({
+        where: { tenantId, examinationId: id, key: { notIn: [...seen] } },
+      }),
+      ...dto.measurements.map((m) =>
+        this.prisma.examinationMeasurement.upsert({
+          where: { examinationId_key: { examinationId: id, key: m.key } },
+          create: {
+            tenantId,
+            examinationId: id,
+            key: m.key,
+            value: m.value,
+            note: m.note ?? null,
+            recordedAt: now,
+            recordedById: actor.id,
+          },
+          update: { value: m.value, note: m.note ?? null, recordedAt: now, recordedById: actor.id },
+        }),
+      ),
+    ]);
+    // Keys only: the values themselves are medical data and stay out of the audit trail.
+    await this.audit.log({
+      tenantId,
+      userId: actor.id,
+      action: AuditAction.UPDATE,
+      entityType: 'Examination',
+      entityId: id,
+      newValue: { measurementKeys: [...seen] },
+      ...ctx,
+    });
+    const rows = await this.prisma.examinationMeasurement.findMany({
+      where: { examinationId: id },
+      select: { key: true, value: true, note: true, recordedAt: true },
+    });
+    return { examinationId: id, measurements: toMeasurementMap(rows) };
   }
 
   /** Physician sign-off. TODO(business-logic): enforce physician role / e-signature. */
