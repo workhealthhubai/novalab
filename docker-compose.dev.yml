@@ -1,0 +1,57 @@
+# Development overrides:
+#   docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d postgres redis minio orthanc ohif nginx
+#   pnpm dev            # API on :3000 and Vite on :5173 run on the host
+#
+# - infrastructure ports are published on localhost
+# - nginx proxies "/" and "/api" to the host processes (Vite + Nest) so that
+#   OHIF (/viewer) and DICOMweb (/dicom-web) work exactly as in production
+# - api/web containers are not needed; `docker compose up` without service
+#   names would still build them, so pass the service list shown above.
+
+services:
+  postgres:
+    ports:
+      - '${POSTGRES_PORT:-5432}:5432'
+
+  redis:
+    ports:
+      - '6379:6379'
+
+  minio:
+    ports:
+      - '${MINIO_PORT:-9000}:9000'
+      - '${MINIO_CONSOLE_PORT:-9001}:9001'
+
+  orthanc:
+    ports:
+      # Orthanc REST/UI for development only (http://localhost:8042, credentials from .env).
+      - '8042:8042'
+      - '4242:4242'
+    environment:
+      VERBOSE_ENABLED: 'true'
+
+  ohif:
+    ports:
+      - '3001:80'
+
+  api:
+    environment:
+      NODE_ENV: development
+      LOG_LEVEL: debug
+      SWAGGER_ENABLED: 'true'
+    ports:
+      - '${API_PORT:-3000}:3000'
+
+  nginx:
+    environment:
+      WEB_UPSTREAM: host.docker.internal:${WEB_PORT:-5173}
+      API_UPSTREAM: host.docker.internal:${API_PORT:-3000}
+    extra_hosts:
+      - 'host.docker.internal:host-gateway'
+    depends_on: !override
+      ohif:
+        condition: service_started
+      orthanc:
+        condition: service_healthy
+    healthcheck:
+      test: ['CMD-SHELL', 'wget -qO- http://127.0.0.1/viewer/ >/dev/null || exit 1']

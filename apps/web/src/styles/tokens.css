@@ -1,0 +1,107 @@
+/*
+ * OSGB Platform design tokens.
+ * Values come from the Figma file "OSGB Platformu — Design System" (variables + component specs).
+ * Semantic tokens below are consumed by Tailwind through @theme in globals.css.
+ */
+:root {
+  /* ---- Figma variables (raw palette) ---- */
+  --brand-primary: #0d9488; /* color/brand/primary */
+  --brand-primary-dark: #0f766e; /* color/brand/primary-dark */
+  --brand-primary-soft: #ccfbf1; /* color/brand/primary-soft */
+  --text-primary: #0f172a; /* color/text/primary */
+  --text-secondary: #64748b; /* color/text/secondary */
+  --text-inverse: #ffffff; /* color/text/inverse */
+  --bg-canvas: #f6f8fa; /* color/bg/canvas */
+  --bg-surface: #ffffff; /* color/bg/surface */
+  --border-default: #e2e8f0; /* color/border/default */
+  --status-success: #059669; /* color/status/success */
+  --status-success-bg: #ecfdf5;
+  --status-warning: #b45309; /* color/status/warning */
+  --status-warning-bg: #fffbeb;
+  --status-info: #2563eb; /* color/status/info */
+  --status-info-bg: #eff6ff;
+  --status-danger: #dc2626; /* color/status/danger */
+  --status-danger-bg: #fef2f2;
+  --status-purple: #7c3aed; /* color/status/purple */
+  --status-purple-bg: #f5f3ff;
+
+  /* ---- Semantic tokens ---- */
+  --background: var(--bg-canvas);
+  --foreground: var(--text-primary);
+  --card: var(--bg-surface);
+  --card-foreground: var(--text-primary);
+  --popover: var(--bg-surface);
+  --popover-foreground: var(--text-primary);
+  --muted: var(--bg-canvas);
+  --muted-foreground: var(--text-secondary);
+  --accent: #f1f5f9;
+  --accent-foreground: var(--text-primary);
+  --border: var(--border-default);
+  --input: var(--border-default);
+  --primary: var(--brand-primary);
+  --primary-foreground: var(--text-inverse);
+  --primary-hover: #0b8276;
+  --primary-soft: var(--brand-primary-soft);
+  --primary-dark: var(--brand-primary-dark);
+  --secondary: var(--bg-surface);
+  --secondary-foreground: var(--text-primary);
+  --destructive: var(--status-danger);
+  --destructive-foreground: var(--text-inverse);
+  --destructive-hover: #b91c1c;
+  --destructive-soft: var(--status-danger-bg);
+  --success: var(--status-success);
+  --success-soft: var(--status-success-bg);
+  --warning: var(--status-warning);
+  --warning-soft: var(--status-warning-bg);
+  --info: var(--status-info);
+  --info-soft: var(--status-info-bg);
+  --ring: var(--brand-primary);
+
+  /* ---- Application shell ---- */
+  --sidebar-background: var(--bg-surface);
+  --sidebar-foreground: var(--text-secondary);
+  --sidebar-muted: var(--text-secondary);
+  --sidebar-active: var(--brand-primary-soft);
+  --sidebar-active-foreground: var(--brand-primary-dark);
+  --sidebar-hover: var(--bg-canvas);
+  --sidebar-border: var(--border-default);
+  --sidebar-width: 256px;
+  --topbar-background: var(--bg-surface);
+  --topbar-foreground: var(--text-primary);
+  --topbar-border: var(--border-default);
+  --topbar-height: 64px;
+
+  /* ---- Status badges ---- */
+  --status-completed: var(--status-success);
+  --status-completed-soft: var(--status-success-bg);
+  --status-waiting: var(--status-warning);
+  --status-waiting-soft: var(--status-warning-bg);
+  --status-processing: var(--status-info);
+  --status-processing-soft: var(--status-info-bg);
+  --status-signed: var(--status-purple);
+  --status-signed-soft: var(--status-purple-bg);
+  --status-cancelled: var(--status-danger);
+  --status-cancelled-soft: var(--status-danger-bg);
+
+  /* ---- Shape ---- */
+  --radius-xs: 4px;
+  --radius-sm: 8px; /* small icon tiles */
+  --radius-md: 10px; /* buttons, inputs, nav items (Figma: 10px) */
+  --radius-lg: 12px; /* user card */
+  --radius-xl: 16px; /* state cards */
+  --radius-2xl: 18px; /* dialogs */
+  --radius-full: 999px;
+
+  /* ---- Elevation (restrained, from Figma) ---- */
+  --shadow-xs: 0 1px 2px rgba(15, 23, 41, 0.06);
+  --shadow-sm: 0 2px 6px rgba(15, 23, 41, 0.08);
+  --shadow-toast: 0 6px 10px rgba(15, 23, 41, 0.12);
+  --shadow-dialog: 0 14px 22px rgba(15, 23, 41, 0.25);
+
+  /* ---- Controls ---- */
+  --control-height-sm: 32px;
+  --control-height: 38px; /* Figma button: 9px + 20px line + 9px */
+  --control-height-lg: 44px;
+  --input-height: 40px;
+  --nav-item-height: 40px;
+}

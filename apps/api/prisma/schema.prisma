@@ -1,0 +1,624 @@
+// -----------------------------------------------------------------------------
+// OSGB Platform - main application schema (Prisma 7)
+//
+// Conventions
+//  - Every business entity carries `tenantId`; tenant isolation is enforced in
+//    the repository layer (see src/common/tenancy) - never trusted from clients.
+//  - UUIDs for all primary keys.
+//  - Soft delete via `deletedAt` where records must remain for audit/legal reasons.
+//  - Orthanc/DICOM binaries are NEVER stored here; only references (study ids).
+//  - Non-DICOM files live in MinIO; `Document` stores bucket/objectKey references.
+// -----------------------------------------------------------------------------
+
+generator client {
+  provider     = "prisma-client"
+  output       = "../src/generated/prisma"
+  moduleFormat = "cjs"
+  runtime      = "nodejs"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ----------------------------- Enums -----------------------------------------
+
+enum TenantStatus {
+  ACTIVE
+  SUSPENDED
+}
+
+enum UserStatus {
+  ACTIVE
+  INVITED
+  SUSPENDED
+  DISABLED
+}
+
+/// Turkish OHS law (6331) hazard classes.
+enum HazardClass {
+  LESS_HAZARDOUS
+  HAZARDOUS
+  VERY_HAZARDOUS
+}
+
+enum EmployeeStatus {
+  ACTIVE
+  ON_LEAVE
+  TERMINATED
+}
+
+enum Gender {
+  MALE
+  FEMALE
+}
+
+enum IdentityVerificationStatus {
+  UNVERIFIED
+  VERIFIED
+  FAILED
+  /// Confirmed by staff against the physical document (no electronic source).
+  MANUAL
+}
+
+enum ExaminationType {
+  PRE_EMPLOYMENT
+  PERIODIC
+  RETURN_TO_WORK
+  EXIT
+  SPECIAL
+}
+
+enum ExaminationStatus {
+  SCHEDULED
+  IN_PROGRESS
+  COMPLETED
+  APPROVED
+  CANCELLED
+}
+
+enum FitnessDecision {
+  PENDING
+  FIT
+  FIT_WITH_RESTRICTIONS
+  UNFIT
+}
+
+enum RadiologyModality {
+  CR
+  DX
+  CT
+  MR
+  US
+  OT
+}
+
+enum RadiologyRequestStatus {
+  REQUESTED
+  SCHEDULED
+  IN_PROGRESS
+  COMPLETED
+  REPORTED
+  CANCELLED
+}
+
+enum AppointmentType {
+  EXAMINATION
+  RADIOLOGY
+  TRAINING
+  CONSULTATION
+  OTHER
+}
+
+enum AppointmentStatus {
+  SCHEDULED
+  CONFIRMED
+  COMPLETED
+  CANCELLED
+  NO_SHOW
+}
+
+enum DocumentCategory {
+  REPORT
+  CERTIFICATE
+  SCANNED_DOCUMENT
+  ATTACHMENT
+  OTHER
+}
+
+// ----------------------------- Tenancy & IAM ---------------------------------
+
+model Tenant {
+  id        String       @id @default(uuid()) @db.Uuid
+  name      String
+  /// URL/identifier friendly unique key, e.g. "acme-osgb".
+  slug      String       @unique
+  status    TenantStatus @default(ACTIVE)
+  settings  Json?
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+  deletedAt DateTime?
+
+  users            User[]
+  roles            Role[]
+  userRoles        UserRole[]
+  refreshSessions  RefreshSession[]
+  companies        Company[]
+  branches         Branch[]
+  workplaces       Workplace[]
+  employees        Employee[]
+  examinations     Examination[]
+  radiologyRequests RadiologyRequest[]
+  documents        Document[]
+  appointments     Appointment[]
+  auditLogs        AuditLog[]
+
+  @@map("tenants")
+}
+
+model User {
+  id           String     @id @default(uuid()) @db.Uuid
+  tenantId     String     @db.Uuid
+  email        String
+  passwordHash String
+  firstName    String
+  lastName     String
+  status       UserStatus @default(ACTIVE)
+  lastLoginAt  DateTime?
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+  deletedAt    DateTime?
+
+  tenant          Tenant           @relation(fields: [tenantId], references: [id])
+  userRoles       UserRole[]
+  refreshSessions RefreshSession[]
+  auditLogs       AuditLog[]
+
+  performedExaminations Examination[] @relation("ExaminationPhysician")
+  approvedExaminations  Examination[] @relation("ExaminationApprover")
+  uploadedDocuments     Document[]    @relation("DocumentUploader")
+  createdAppointments   Appointment[] @relation("AppointmentCreator")
+
+  @@unique([tenantId, email])
+  @@index([tenantId])
+  @@map("users")
+}
+
+model Role {
+  id          String   @id @default(uuid()) @db.Uuid
+  tenantId    String   @db.Uuid
+  name        String
+  description String?
+  /// System roles are created by the seed and cannot be deleted by tenant admins.
+  isSystem    Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  tenant          Tenant           @relation(fields: [tenantId], references: [id])
+  userRoles       UserRole[]
+  rolePermissions RolePermission[]
+
+  @@unique([tenantId, name])
+  @@map("roles")
+}
+
+/// Global permission catalogue (not tenant scoped). Seeded from @osgb/shared-types.
+model Permission {
+  id          String   @id @default(uuid()) @db.Uuid
+  key         String   @unique
+  category    String
+  description String
+  /// Grants access to sensitive occupational-health data.
+  isMedical   Boolean  @default(false)
+  createdAt   DateTime @default(now())
+
+  rolePermissions RolePermission[]
+
+  @@map("permissions")
+}
+
+model UserRole {
+  id        String   @id @default(uuid()) @db.Uuid
+  tenantId  String   @db.Uuid
+  userId    String   @db.Uuid
+  roleId    String   @db.Uuid
+  createdAt DateTime @default(now())
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role   Role   @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, roleId])
+  @@index([tenantId])
+  @@map("user_roles")
+}
+
+model RolePermission {
+  id           String   @id @default(uuid()) @db.Uuid
+  roleId       String   @db.Uuid
+  permissionId String   @db.Uuid
+  createdAt    DateTime @default(now())
+
+  role       Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@unique([roleId, permissionId])
+  @@map("role_permissions")
+}
+
+/// Refresh token session. Only a SHA-256 hash of the token is stored.
+model RefreshSession {
+  id        String    @id @default(uuid()) @db.Uuid
+  tenantId  String    @db.Uuid
+  userId    String    @db.Uuid
+  tokenHash String    @unique
+  userAgent String?
+  ipAddress String?
+  expiresAt DateTime
+  revokedAt DateTime?
+  /// Set when the session was rotated; used for refresh-token reuse detection.
+  replacedById String? @db.Uuid
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([tenantId])
+  @@map("refresh_sessions")
+}
+
+// ----------------------------- Customers -------------------------------------
+
+/// A client company served by the OSGB.
+model Company {
+  id                    String      @id @default(uuid()) @db.Uuid
+  tenantId              String      @db.Uuid
+  name                  String
+  taxNumber             String?
+  sgkRegistrationNumber String?
+  hazardClass           HazardClass @default(LESS_HAZARDOUS)
+  address               String?
+  phone                 String?
+  email                 String?
+  createdAt             DateTime    @default(now())
+  updatedAt             DateTime    @updatedAt
+  deletedAt             DateTime?
+
+  tenant       Tenant        @relation(fields: [tenantId], references: [id])
+  branches     Branch[]
+  workplaces   Workplace[]
+  employees    Employee[]
+  documents    Document[]
+  appointments Appointment[]
+
+  @@index([tenantId])
+  @@index([tenantId, name])
+  @@map("companies")
+}
+
+model Branch {
+  id        String    @id @default(uuid()) @db.Uuid
+  tenantId  String    @db.Uuid
+  companyId String    @db.Uuid
+  name      String
+  address   String?
+  phone     String?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  tenant     Tenant      @relation(fields: [tenantId], references: [id])
+  company    Company     @relation(fields: [companyId], references: [id])
+  workplaces Workplace[]
+  employees  Employee[]
+
+  @@index([tenantId])
+  @@index([tenantId, companyId])
+  @@map("branches")
+}
+
+/// A physical workplace (işyeri) registered under a company/branch.
+model Workplace {
+  id                    String      @id @default(uuid()) @db.Uuid
+  tenantId              String      @db.Uuid
+  companyId             String      @db.Uuid
+  branchId              String?     @db.Uuid
+  name                  String
+  sgkRegistrationNumber String?
+  hazardClass           HazardClass @default(LESS_HAZARDOUS)
+  naceCode              String?
+  address               String?
+  employeeCount         Int?
+  createdAt             DateTime    @default(now())
+  updatedAt             DateTime    @updatedAt
+  deletedAt             DateTime?
+
+  tenant    Tenant     @relation(fields: [tenantId], references: [id])
+  company   Company    @relation(fields: [companyId], references: [id])
+  branch    Branch?    @relation(fields: [branchId], references: [id])
+  employees Employee[]
+
+  @@index([tenantId])
+  @@index([tenantId, companyId])
+  @@map("workplaces")
+}
+
+model Employee {
+  id          String         @id @default(uuid()) @db.Uuid
+  tenantId    String         @db.Uuid
+  /// Optional at registration; the workplace can be assigned later (Hasta Kayıt → Düzenle).
+  companyId   String?        @db.Uuid
+  branchId    String?        @db.Uuid
+  workplaceId String?        @db.Uuid
+  /// National identity number (TC Kimlik No). Personal data - handle with care.
+  nationalId  String?
+  /// Employer/registry number (Sicil No).
+  registrationNumber String?
+  passportNumber     String?
+  firstName   String
+  lastName    String
+  birthDate   DateTime?      @db.Date
+  gender      Gender?
+  motherName  String?
+  fatherName  String?
+  /// Mobile (GSM), 10 digits without country code.
+  phone       String?
+  /// Landline (Ev Tel), 10 digits.
+  homePhone   String?
+  email       String?
+  addressProvinceId     Int?
+  addressDistrictId     Int?
+  addressNeighborhoodId Int?
+  addressLine           String?
+  /// Free-text warning / note shown on the patient card (Uyarı/Açıklama).
+  notes       String?
+  jobTitle    String?
+  department  String?
+  hireDate    DateTime?      @db.Date
+  status      EmployeeStatus @default(ACTIVE)
+
+  identityVerificationStatus IdentityVerificationStatus @default(UNVERIFIED)
+  identityVerifiedAt         DateTime?
+  /// Provider that confirmed the identity, e.g. "nvi-kps-public" or "manual".
+  identityVerificationSource String?
+
+  /// Portrait taken at registration; MinIO object key (`<tenantId>/employees/<id>/photo-<uuid>.jpg`).
+  photoKey       String?
+  photoUpdatedAt DateTime?
+
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+  deletedAt   DateTime?
+
+  tenant            Tenant             @relation(fields: [tenantId], references: [id])
+  company           Company?           @relation(fields: [companyId], references: [id])
+  branch            Branch?            @relation(fields: [branchId], references: [id])
+  workplace         Workplace?         @relation(fields: [workplaceId], references: [id])
+  addressProvince     Province?     @relation(fields: [addressProvinceId], references: [id])
+  addressDistrict     District?     @relation(fields: [addressDistrictId], references: [id])
+  addressNeighborhood Neighborhood? @relation(fields: [addressNeighborhoodId], references: [id])
+  examinations      Examination[]
+  radiologyRequests RadiologyRequest[]
+  documents         Document[]
+  appointments      Appointment[]
+
+  // Uniqueness of nationalId / registrationNumber per tenant applies to ACTIVE records only
+  // (partial unique indexes, see migration *_employee_partial_unique_indexes). Prisma cannot
+  // express partial indexes, so plain indexes are declared here.
+  @@index([tenantId, nationalId])
+  @@index([tenantId, registrationNumber])
+  @@index([tenantId])
+  @@index([tenantId, companyId])
+  @@index([tenantId, lastName, firstName])
+  @@map("employees")
+}
+
+// ----------------------------- Reference data (global) -----------------------
+
+/// Turkish provinces (il). `id` is the licence-plate code (1-81).
+model Province {
+  id        Int        @id
+  name      String
+  districts District[]
+  employees Employee[]
+
+  @@map("provinces")
+}
+
+model District {
+  id            Int            @id
+  provinceId    Int
+  name          String
+  province      Province       @relation(fields: [provinceId], references: [id])
+  neighborhoods Neighborhood[]
+  employees     Employee[]
+
+  @@index([provinceId])
+  @@map("districts")
+}
+
+model Neighborhood {
+  id         Int        @id
+  districtId Int
+  name       String
+  district   District   @relation(fields: [districtId], references: [id])
+  employees  Employee[]
+
+  @@index([districtId])
+  @@map("neighborhoods")
+}
+
+// ----------------------------- Medical ---------------------------------------
+// NOTE: Examination and RadiologyRequest contain sensitive health data.
+// Access is gated by "medical" permissions and the @MedicalData() decorator.
+
+model Examination {
+  id                 String            @id @default(uuid()) @db.Uuid
+  tenantId           String            @db.Uuid
+  employeeId         String            @db.Uuid
+  type               ExaminationType
+  status             ExaminationStatus @default(SCHEDULED)
+  scheduledAt        DateTime?
+  performedAt        DateTime?
+  physicianId        String?           @db.Uuid
+  /// Clinical findings - medical data.
+  findings           String?
+  /// Physician conclusion - medical data.
+  conclusion         String?
+  fitnessDecision    FitnessDecision   @default(PENDING)
+  restrictions       String?
+  approvedById       String?           @db.Uuid
+  approvedAt         DateTime?
+  nextExaminationDue DateTime?         @db.Date
+  createdAt          DateTime          @default(now())
+  updatedAt          DateTime          @updatedAt
+  deletedAt          DateTime?
+
+  tenant            Tenant             @relation(fields: [tenantId], references: [id])
+  employee          Employee           @relation(fields: [employeeId], references: [id])
+  physician         User?              @relation("ExaminationPhysician", fields: [physicianId], references: [id])
+  approvedBy        User?              @relation("ExaminationApprover", fields: [approvedById], references: [id])
+  radiologyRequests RadiologyRequest[]
+  documents         Document[]
+  appointments      Appointment[]
+
+  @@index([tenantId])
+  @@index([tenantId, employeeId])
+  @@index([tenantId, status])
+  @@map("examinations")
+}
+
+/// Reference to a DICOM study stored in Orthanc. No pixel data is stored here.
+model RadiologyRequest {
+  id               String                 @id @default(uuid()) @db.Uuid
+  tenantId         String                 @db.Uuid
+  employeeId       String                 @db.Uuid
+  examinationId    String?                @db.Uuid
+  modality         RadiologyModality
+  status           RadiologyRequestStatus @default(REQUESTED)
+  bodyPart         String?
+  clinicalInfo     String?
+  /// Orthanc internal patient identifier.
+  orthancPatientId String?
+  /// Orthanc internal study identifier.
+  orthancStudyId   String?
+  /// DICOM StudyInstanceUID (0020,000D) - used to open the study in OHIF.
+  studyInstanceUid String?
+  requestedAt      DateTime               @default(now())
+  completedAt      DateTime?
+  /// Radiology report - medical data.
+  reportText       String?
+  reportedById     String?                @db.Uuid
+  reportedAt       DateTime?
+  createdAt        DateTime               @default(now())
+  updatedAt        DateTime               @updatedAt
+  deletedAt        DateTime?
+
+  tenant       Tenant        @relation(fields: [tenantId], references: [id])
+  employee     Employee      @relation(fields: [employeeId], references: [id])
+  examination  Examination?  @relation(fields: [examinationId], references: [id])
+  appointments Appointment[]
+
+  @@index([tenantId])
+  @@index([tenantId, employeeId])
+  @@index([tenantId, studyInstanceUid])
+  @@map("radiology_requests")
+}
+
+// ----------------------------- Files & scheduling ----------------------------
+
+/// Metadata for a file stored in MinIO (PDFs, certificates, scans, attachments).
+model Document {
+  id            String           @id @default(uuid()) @db.Uuid
+  tenantId      String           @db.Uuid
+  category      DocumentCategory @default(OTHER)
+  fileName      String
+  mimeType      String
+  sizeBytes     Int
+  bucket        String
+  /// Object key inside the bucket; always prefixed with the tenant id.
+  objectKey     String           @unique
+  checksum      String?
+  /// True when the document contains health data (stricter access rules).
+  isMedical     Boolean          @default(false)
+  employeeId    String?          @db.Uuid
+  companyId     String?          @db.Uuid
+  examinationId String?          @db.Uuid
+  uploadedById  String?          @db.Uuid
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+  deletedAt     DateTime?
+
+  tenant      Tenant       @relation(fields: [tenantId], references: [id])
+  employee    Employee?    @relation(fields: [employeeId], references: [id])
+  company     Company?     @relation(fields: [companyId], references: [id])
+  examination Examination? @relation(fields: [examinationId], references: [id])
+  uploadedBy  User?        @relation("DocumentUploader", fields: [uploadedById], references: [id])
+
+  @@index([tenantId])
+  @@index([tenantId, employeeId])
+  @@index([tenantId, category])
+  @@map("documents")
+}
+
+model Appointment {
+  id                 String            @id @default(uuid()) @db.Uuid
+  tenantId           String            @db.Uuid
+  type               AppointmentType   @default(EXAMINATION)
+  status             AppointmentStatus @default(SCHEDULED)
+  title              String
+  startsAt           DateTime
+  endsAt             DateTime
+  location           String?
+  notes              String?
+  employeeId         String?           @db.Uuid
+  companyId          String?           @db.Uuid
+  examinationId      String?           @db.Uuid
+  radiologyRequestId String?           @db.Uuid
+  createdById        String?           @db.Uuid
+  createdAt          DateTime          @default(now())
+  updatedAt          DateTime          @updatedAt
+  deletedAt          DateTime?
+
+  tenant           Tenant            @relation(fields: [tenantId], references: [id])
+  employee         Employee?         @relation(fields: [employeeId], references: [id])
+  company          Company?          @relation(fields: [companyId], references: [id])
+  examination      Examination?      @relation(fields: [examinationId], references: [id])
+  radiologyRequest RadiologyRequest? @relation(fields: [radiologyRequestId], references: [id])
+  createdBy        User?             @relation("AppointmentCreator", fields: [createdById], references: [id])
+
+  @@index([tenantId])
+  @@index([tenantId, startsAt])
+  @@map("appointments")
+}
+
+// ----------------------------- Audit -----------------------------------------
+
+model AuditLog {
+  id         String   @id @default(uuid()) @db.Uuid
+  tenantId   String   @db.Uuid
+  userId     String?  @db.Uuid
+  action     String
+  entityType String
+  entityId   String?
+  oldValue   Json?
+  newValue   Json?
+  ipAddress  String?
+  userAgent  String?
+  /// Correlation id of the HTTP request (X-Request-Id) - joins audit rows with application logs.
+  requestId  String?
+  /// Request/outcome details for automatically captured entries: method, path, statusCode, durationMs, outcome, errorCode.
+  metadata   Json?
+  createdAt  DateTime @default(now())
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+  user   User?  @relation(fields: [userId], references: [id])
+
+  @@index([tenantId, createdAt])
+  @@index([tenantId, entityType, entityId])
+  @@index([tenantId, userId])
+  @@index([requestId])
+  @@map("audit_logs")
+}

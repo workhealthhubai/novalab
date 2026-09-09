@@ -1,0 +1,101 @@
+# Rendered by the nginx image entrypoint with envsubst. Variables:
+#   WEB_UPSTREAM, API_UPSTREAM, OHIF_UPSTREAM, ORTHANC_UPSTREAM, ORTHANC_BASIC_AUTH_B64
+#
+# Routing:
+#   /            -> React web app (or Vite dev server in docker-compose.dev.yml)
+#   /api/        -> NestJS API
+#   /viewer/     -> OHIF viewer
+#   /dicom-web/  -> Orthanc DICOMweb (auth_request gated, Orthanc credentials injected here)
+#   OHIF root assets (/app.bundle.*.js, /assets/, ...) -> OHIF (its bundle is built for PUBLIC_URL=/)
+#
+# The Orthanc admin UI/REST API (:8042) is NOT exposed. Enable it only on a
+# private network or behind additional authentication.
+
+server {
+  listen 80 default_server;
+  listen [::]:80 default_server;
+  server_name _;
+
+  # Security headers (the API adds its own via Helmet).
+  add_header X-Content-Type-Options nosniff always;
+  add_header X-Frame-Options SAMEORIGIN always;
+  add_header Referrer-Policy strict-origin-when-cross-origin always;
+  # Camera is used in the app itself (ID card scan, patient photo); nothing is delegated to third parties.
+  add_header Permissions-Policy "camera=(self), microphone=(), geolocation=()" always;
+
+  proxy_http_version 1.1;
+  proxy_set_header Host              $host;
+  proxy_set_header X-Real-IP         $remote_addr;
+  proxy_set_header X-Forwarded-For   $proxy_add_x_forwarded_for;
+  proxy_set_header X-Forwarded-Proto $scheme;
+  proxy_set_header X-Forwarded-Host  $host;
+  proxy_set_header X-Request-Id      $request_id;
+  proxy_read_timeout 120s;
+
+  # ---------------------------------------------------------------- API
+  location /api/ {
+    proxy_pass http://${API_UPSTREAM};
+    proxy_buffering off;
+  }
+
+  # Liveness for external load balancers (readiness stays internal).
+  location = /health/live {
+    proxy_pass http://${API_UPSTREAM}/health/live;
+    access_log off;
+  }
+
+  # ---------------------------------------------------------------- DICOMweb (Orthanc)
+  # Internal auth subrequest: the API validates the short-lived viewer cookie.
+  location = /_dicomweb_auth {
+    internal;
+    proxy_pass http://${API_UPSTREAM}/api/auth/verify-dicomweb;
+    proxy_pass_request_body off;
+    proxy_set_header Content-Length "";
+    proxy_set_header Cookie $http_cookie;
+    proxy_set_header X-Original-URI $request_uri;
+  }
+
+  location /dicom-web/ {
+    auth_request /_dicomweb_auth;
+    auth_request_set $osgb_user $upstream_http_x_osgb_user_id;
+
+    proxy_pass http://${ORTHANC_UPSTREAM}/dicom-web/;
+    # Orthanc credentials never reach the browser; Nginx authenticates on its behalf.
+    proxy_set_header Authorization "Basic ${ORTHANC_BASIC_AUTH_B64}";
+    proxy_set_header Cookie "";
+    proxy_set_header X-OSGB-User $osgb_user;
+    proxy_buffering off;
+    proxy_request_buffering off;
+    proxy_read_timeout 300s;
+    client_max_body_size 512m;
+  }
+
+  # ---------------------------------------------------------------- OHIF viewer
+  location /viewer/ {
+    proxy_pass http://${OHIF_UPSTREAM}/;
+  }
+  location = /viewer {
+    return 301 /viewer/;
+  }
+
+  # OHIF's pre-built bundle references its assets from the site root
+  # (verified against ohif/app:v3.13.6 - adjust when upgrading the image).
+  location ~ ^/(app-config\.js|manifest\.json|google\.js|es6-shim\.min\.js|polyfill\.min\.js|oidc-client\.min\.js|silent-refresh\.html|ohif-logo[^/]*\.svg|[^/]+\.bundle\.[0-9a-f]+\.js|[^/]+\.bundle\.css|[0-9]+\.css|[0-9a-f]+\.wasm|[0-9a-f]+\.woff2?)$ {
+    proxy_pass http://${OHIF_UPSTREAM};
+  }
+  location ~ ^/(assets|customizations|dicom-microscopy-viewer|ort|locales)/ {
+    proxy_pass http://${OHIF_UPSTREAM};
+  }
+  # OHIF's service worker would otherwise register at scope "/" and cache the web app.
+  location ~ ^/(init-service-worker\.js|service-worker\.js|sw\.js)$ {
+    return 404;
+  }
+
+  # ---------------------------------------------------------------- Web app
+  location / {
+    proxy_pass http://${WEB_UPSTREAM};
+    # Vite HMR websocket in development; harmless in production.
+    proxy_set_header Upgrade $http_upgrade;
+    proxy_set_header Connection $connection_upgrade;
+  }
+}

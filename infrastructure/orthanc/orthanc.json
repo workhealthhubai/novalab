@@ -1,0 +1,62 @@
+{
+  "_comment": "Non-secret Orthanc settings. Secrets and hostnames are injected through ORTHANC__* environment variables in docker-compose.yml (see orthancteam/orthanc image docs).",
+
+  "Name": "OSGB PACS",
+  "StorageDirectory": "/var/lib/orthanc/db",
+  "IndexDirectory": "/var/lib/orthanc/db",
+  "StorageCompression": false,
+  "MaximumStorageSize": 0,
+  "MaximumPatientCount": 0,
+
+  "HttpPort": 8042,
+  "HttpServerEnabled": true,
+  "RemoteAccessAllowed": true,
+  "AuthenticationEnabled": true,
+  "SslEnabled": false,
+  "HttpCompressionEnabled": true,
+  "HttpRequestTimeout": 30,
+  "KeepAlive": true,
+  "HttpDescribeErrors": true,
+
+  "DicomServerEnabled": true,
+  "DicomPort": 4242,
+  "DicomAet": "OSGB",
+  "DicomCheckCalledAet": false,
+  "DicomAlwaysAllowStore": true,
+  "DicomAlwaysAllowEcho": true,
+  "UnknownSopClassAccepted": false,
+
+  "StableAge": 60,
+  "StrictAetComparison": false,
+  "StoreMD5ForAttachments": true,
+  "LimitFindResults": 100,
+  "LimitFindInstances": 0,
+  "OverwriteInstances": false,
+
+  "DicomWeb": {
+    "Enable": true,
+    "Root": "/dicom-web/",
+    "EnableWado": true,
+    "WadoRoot": "/wado",
+    "Ssl": false,
+    "QidoCaseSensitive": false,
+    "StudiesMetadata": "MainDicomTags",
+    "SeriesMetadata": "Full",
+    "EnableMetadataCache": true
+  },
+
+  "PostgreSQL": {
+    "EnableIndex": true,
+    "EnableStorage": false,
+    "Lock": false,
+    "EnableSsl": false,
+    "MaximumConnectionRetries": 10,
+    "ConnectionRetryInterval": 5,
+    "IndexConnectionsCount": 5
+  },
+
+  "OrthancExplorer2": {
+    "Enable": true,
+    "IsDefaultOrthancUI": true
+  }
+}

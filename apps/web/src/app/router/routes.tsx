@@ -1,0 +1,98 @@
+import { Navigate, type RouteObject } from 'react-router';
+import { AppLayout } from '@/layouts/app-layout';
+import { AuthLayout } from '@/layouts/auth-layout';
+import { DashboardPage } from '@/pages/dashboard-page';
+import { AudiometryPage } from '@/pages/doctor/audiometry-page';
+import { ESignaturePage } from '@/pages/doctor/e-signature-page';
+import { EcgPage } from '@/pages/doctor/ecg-page';
+import { EyePage } from '@/pages/doctor/eye-page';
+import { HealthReportsPage } from '@/pages/doctor/health-reports-page';
+import { IsgReportsPage } from '@/pages/doctor/isg-reports-page';
+import { LabResultsPage } from '@/pages/doctor/lab-results-page';
+import { PneumoconiosisPage } from '@/pages/doctor/pneumoconiosis-page';
+import { RadiologyPage } from '@/pages/doctor/radiology-page';
+import { ReportTemplatesPage } from '@/pages/doctor/report-templates-page';
+import { SpirometryPage } from '@/pages/doctor/spirometry-page';
+import { LoginPage } from '@/pages/login-page';
+import { NotFoundPage } from '@/pages/not-found-page';
+import { DocumentSigningPage } from '@/pages/patient-registration/document-signing-page';
+import { ExaminationComparisonPage } from '@/pages/patient-registration/examination-comparison-page';
+import { PatientDetailPage } from '@/pages/patient-registration/patient-detail-page';
+import { PatientFormPage } from '@/pages/patient-registration/patient-form-page';
+import { PatientsPage } from '@/pages/patient-registration/patients-page';
+import { ProtocolsPage } from '@/pages/patient-registration/protocols-page';
+import { AccountingPage } from '@/pages/settings/accounting-page';
+import { ActiveUsersPage } from '@/pages/settings/active-users-page';
+import { BulkCompanyImportPage } from '@/pages/settings/bulk-company-import-page';
+import { BulkPatientImportPage } from '@/pages/settings/bulk-patient-import-page';
+import { CompaniesPage } from '@/pages/settings/companies-page';
+import { DicomRecordsPage } from '@/pages/settings/dicom-records-page';
+import { DoctorPayoutsPage } from '@/pages/settings/doctor-payouts-page';
+import { DoctorsPage } from '@/pages/settings/doctors-page';
+import { KkkPermissionsPage } from '@/pages/settings/kkk-permissions-page';
+import { OccupationsPage } from '@/pages/settings/occupations-page';
+import { OrganizationPage } from '@/pages/settings/organization-page';
+import { StaffMovementsPage } from '@/pages/settings/staff-movements-page';
+import { StaffPage } from '@/pages/settings/staff-page';
+import { SubOsgbPage } from '@/pages/settings/sub-osgb-page';
+import { TestPackagesPage } from '@/pages/settings/test-packages-page';
+import { TestsPage } from '@/pages/settings/tests-page';
+import { PATHS } from './navigation';
+import { PermissionGate } from './permission-gate';
+
+/** Every planned URL exists from Phase 1 on; detail routes render the module placeholder. */
+export const routes: RouteObject[] = [
+  { path: '/', element: <Navigate to={PATHS.dashboard} replace /> },
+  {
+    element: <AuthLayout />,
+    children: [{ path: PATHS.login, element: <LoginPage /> }],
+  },
+  {
+    element: <AppLayout />,
+    children: [
+      {
+        element: <PermissionGate />,
+        children: [
+          { path: PATHS.dashboard, element: <DashboardPage /> },
+          { path: PATHS.patients, element: <PatientsPage /> },
+          { path: PATHS.patientNew, element: <PatientFormPage /> },
+          { path: PATHS.patientDetail, element: <PatientDetailPage /> },
+          { path: PATHS.patientEdit, element: <PatientFormPage /> },
+          { path: PATHS.protocols, element: <ProtocolsPage /> },
+          { path: PATHS.protocolDetail, element: <ProtocolsPage /> },
+          { path: PATHS.documentSigning, element: <DocumentSigningPage /> },
+          { path: PATHS.examinationComparison, element: <ExaminationComparisonPage /> },
+          { path: PATHS.radiology, element: <RadiologyPage /> },
+          { path: PATHS.radiologyStudy, element: <RadiologyPage /> },
+          { path: PATHS.audiometry, element: <AudiometryPage /> },
+          { path: PATHS.ecg, element: <EcgPage /> },
+          { path: PATHS.spirometry, element: <SpirometryPage /> },
+          { path: PATHS.eye, element: <EyePage /> },
+          { path: PATHS.pneumoconiosis, element: <PneumoconiosisPage /> },
+          { path: PATHS.healthReports, element: <HealthReportsPage /> },
+          { path: PATHS.isgReports, element: <IsgReportsPage /> },
+          { path: PATHS.labResults, element: <LabResultsPage /> },
+          { path: PATHS.reportTemplates, element: <ReportTemplatesPage /> },
+          { path: PATHS.eSignature, element: <ESignaturePage /> },
+          { path: PATHS.organization, element: <OrganizationPage /> },
+          { path: PATHS.companies, element: <CompaniesPage /> },
+          { path: PATHS.doctors, element: <DoctorsPage /> },
+          { path: PATHS.doctorPayouts, element: <DoctorPayoutsPage /> },
+          { path: PATHS.tests, element: <TestsPage /> },
+          { path: PATHS.testPackages, element: <TestPackagesPage /> },
+          { path: PATHS.occupations, element: <OccupationsPage /> },
+          { path: PATHS.bulkPatientImport, element: <BulkPatientImportPage /> },
+          { path: PATHS.bulkCompanyImport, element: <BulkCompanyImportPage /> },
+          { path: PATHS.staff, element: <StaffPage /> },
+          { path: PATHS.staffMovements, element: <StaffMovementsPage /> },
+          { path: PATHS.activeUsers, element: <ActiveUsersPage /> },
+          { path: PATHS.kkkPermissions, element: <KkkPermissionsPage /> },
+          { path: PATHS.accounting, element: <AccountingPage /> },
+          { path: PATHS.dicomRecords, element: <DicomRecordsPage /> },
+          { path: PATHS.subOsgb, element: <SubOsgbPage /> },
+        ],
+      },
+    ],
+  },
+  { path: '*', element: <NotFoundPage /> },
+];

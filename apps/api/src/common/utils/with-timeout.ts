@@ -1,0 +1,16 @@
+/** Rejects if the promise does not settle within `ms`. Used by readiness checks. */
+export async function withTimeout<T>(
+  promise: Promise<T>,
+  ms: number,
+  label = 'operation',
+): Promise<T> {
+  let timer: NodeJS.Timeout | undefined;
+  const timeout = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => reject(new Error(`${label} timed out after ${ms}ms`)), ms);
+  });
+  try {
+    return await Promise.race([promise, timeout]);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}

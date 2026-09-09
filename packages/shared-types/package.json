@@ -1,0 +1,37 @@
+{
+  "name": "@osgb/shared-types",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Types, enums and constants shared between the API and the web client",
+  "main": "./dist/cjs/index.js",
+  "module": "./dist/esm/index.js",
+  "types": "./dist/cjs/index.d.ts",
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./dist/esm/index.d.ts",
+        "default": "./dist/esm/index.js"
+      },
+      "require": {
+        "types": "./dist/cjs/index.d.ts",
+        "default": "./dist/cjs/index.js"
+      }
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "rm -rf dist && tsc -p tsconfig.cjs.json && tsc -p tsconfig.esm.json && echo '{\"type\":\"module\"}' > dist/esm/package.json",
+    "dev": "tsc -p tsconfig.cjs.json --watch --preserveWatchOutput",
+    "typecheck": "tsc -p tsconfig.cjs.json --noEmit",
+    "lint": "eslint .",
+    "clean": "rm -rf dist"
+  },
+  "devDependencies": {
+    "@osgb/eslint-config": "workspace:*",
+    "@osgb/tsconfig": "workspace:*",
+    "eslint": "^10.10.0",
+    "typescript": "~6.0.3"
+  }
+}

@@ -1,0 +1,10 @@
+{
+  "extends": "@osgb/tsconfig/library.json",
+  "compilerOptions": {
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "rootDir": "src",
+    "outDir": "dist/esm"
+  },
+  "include": ["src"]
+}

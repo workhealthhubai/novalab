@@ -1,0 +1,94 @@
+import {
+  ALL_PERMISSIONS,
+  PERMISSIONS,
+  SYSTEM_ROLES,
+  type Permission,
+  type SystemRole,
+} from '@osgb/shared-types';
+
+export interface RoleTemplate {
+  name: SystemRole;
+  description: string;
+  permissions: readonly Permission[];
+}
+
+/**
+ * Default roles provisioned for every tenant. Shared by the seed script and
+ * TenantsService so new tenants always start with a consistent baseline.
+ */
+export const ROLE_TEMPLATES: readonly RoleTemplate[] = [
+  {
+    name: SYSTEM_ROLES.TENANT_ADMIN,
+    description: 'Full access to the tenant, including user and role management',
+    permissions: ALL_PERMISSIONS,
+  },
+  {
+    name: SYSTEM_ROLES.OCCUPATIONAL_PHYSICIAN,
+    description: 'İşyeri hekimi - performs and approves examinations, reads radiology',
+    permissions: [
+      PERMISSIONS.COMPANIES_READ,
+      PERMISSIONS.EMPLOYEES_READ,
+      PERMISSIONS.EMPLOYEES_UPDATE,
+      PERMISSIONS.WORKPLACES_READ,
+      PERMISSIONS.EXAMINATIONS_READ,
+      PERMISSIONS.EXAMINATIONS_CREATE,
+      PERMISSIONS.EXAMINATIONS_UPDATE,
+      PERMISSIONS.EXAMINATIONS_APPROVE,
+      PERMISSIONS.RADIOLOGY_READ,
+      PERMISSIONS.RADIOLOGY_CREATE,
+      PERMISSIONS.RADIOLOGY_REPORT,
+      PERMISSIONS.APPOINTMENTS_READ,
+      PERMISSIONS.APPOINTMENTS_MANAGE,
+      PERMISSIONS.DOCUMENTS_READ,
+      PERMISSIONS.DOCUMENTS_UPLOAD,
+      PERMISSIONS.REPORTS_EXPORT,
+    ],
+  },
+  {
+    name: SYSTEM_ROLES.SAFETY_SPECIALIST,
+    description: 'İş güvenliği uzmanı - workplaces, trainings and certificates',
+    permissions: [
+      PERMISSIONS.COMPANIES_READ,
+      PERMISSIONS.EMPLOYEES_READ,
+      PERMISSIONS.WORKPLACES_READ,
+      PERMISSIONS.WORKPLACES_MANAGE,
+      PERMISSIONS.TRAININGS_READ,
+      PERMISSIONS.TRAININGS_MANAGE,
+      PERMISSIONS.CERTIFICATES_READ,
+      PERMISSIONS.CERTIFICATES_MANAGE,
+      PERMISSIONS.APPOINTMENTS_READ,
+      PERMISSIONS.APPOINTMENTS_MANAGE,
+      PERMISSIONS.DOCUMENTS_READ,
+      PERMISSIONS.DOCUMENTS_UPLOAD,
+      PERMISSIONS.REPORTS_EXPORT,
+    ],
+  },
+  {
+    name: SYSTEM_ROLES.NURSE,
+    description: 'Sağlık personeli - schedules and prepares examinations',
+    permissions: [
+      PERMISSIONS.EMPLOYEES_READ,
+      PERMISSIONS.EXAMINATIONS_READ,
+      PERMISSIONS.EXAMINATIONS_CREATE,
+      PERMISSIONS.EXAMINATIONS_UPDATE,
+      PERMISSIONS.RADIOLOGY_READ,
+      PERMISSIONS.RADIOLOGY_CREATE,
+      PERMISSIONS.APPOINTMENTS_READ,
+      PERMISSIONS.APPOINTMENTS_MANAGE,
+      PERMISSIONS.DOCUMENTS_READ,
+      PERMISSIONS.DOCUMENTS_UPLOAD,
+    ],
+  },
+  {
+    name: SYSTEM_ROLES.COMPANY_REPRESENTATIVE,
+    description: 'Client company contact - non-medical read access',
+    permissions: [
+      PERMISSIONS.COMPANIES_READ,
+      PERMISSIONS.EMPLOYEES_READ,
+      PERMISSIONS.WORKPLACES_READ,
+      PERMISSIONS.APPOINTMENTS_READ,
+      PERMISSIONS.TRAININGS_READ,
+      PERMISSIONS.CERTIFICATES_READ,
+    ],
+  },
+];

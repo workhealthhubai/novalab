@@ -1,0 +1,26 @@
+packages:
+  - 'apps/*'
+  - 'packages/*'
+
+# pnpm blocks lifecycle scripts of dependencies unless explicitly allowed.
+# Only native/binary packages the project actually needs are approved here.
+allowBuilds:
+  '@parcel/watcher': true
+  '@prisma/engines': true
+  '@scarf/scarf': false
+  argon2: true
+  esbuild: true
+  msgpackr-extract: true
+  prisma: true
+  'tesseract.js': false # postinstall is only an opencollective notice
+  unrs-resolver: true
+
+minimumReleaseAgeExclude:
+  - '@typescript-eslint/eslint-plugin@8.70.0'
+  - '@typescript-eslint/parser@8.70.0'
+  - '@typescript-eslint/type-utils@8.70.0'
+  - '@typescript-eslint/utils@8.70.0'
+  - typescript-eslint@8.70.0
+
+# Supply-chain protection: only install package versions published at least 24h ago.
+minimumReleaseAge: 1440

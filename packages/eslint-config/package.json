@@ -1,0 +1,24 @@
+{
+  "name": "@osgb/eslint-config",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Shared ESLint flat configs",
+  "exports": {
+    "./base": "./base.js",
+    "./nest": "./nest.js",
+    "./react": "./react.js"
+  },
+  "dependencies": {
+    "@eslint/js": "^10.0.1",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-react-hooks": "^7.1.1",
+    "eslint-plugin-react-refresh": "^0.5.6",
+    "globals": "^17.12.0",
+    "typescript-eslint": "~8.69.0"
+  },
+  "peerDependencies": {
+    "eslint": "^10.0.0",
+    "typescript": ">=5.4"
+  }
+}

@@ -1,0 +1,35 @@
+{
+  "name": "osgb-platform",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Multi-tenant OSGB (occupational health & safety) management platform - monorepo",
+  "packageManager": "pnpm@12.3.4",
+  "engines": {
+    "node": ">=24.0.0",
+    "pnpm": ">=10.0.0"
+  },
+  "scripts": {
+    "dev": "turbo run dev",
+    "build": "turbo run build",
+    "lint": "turbo run lint",
+    "typecheck": "turbo run typecheck",
+    "test": "turbo run test",
+    "test:e2e": "turbo run test:e2e",
+    "format": "prettier --write \"**/*.{ts,tsx,js,cjs,mjs,json,md,yml,yaml}\"",
+    "format:check": "prettier --check \"**/*.{ts,tsx,js,cjs,mjs,json,md,yml,yaml}\"",
+    "clean": "turbo run clean && rm -rf node_modules",
+    "db:generate": "pnpm --filter @osgb/api prisma:generate",
+    "db:migrate": "pnpm --filter @osgb/api prisma:migrate",
+    "db:migrate:deploy": "pnpm --filter @osgb/api prisma:migrate:deploy",
+    "db:seed": "pnpm --filter @osgb/api prisma:seed",
+    "db:studio": "pnpm --filter @osgb/api prisma:studio",
+    "docker:up": "docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d",
+    "docker:down": "docker compose -f docker-compose.yml -f docker-compose.dev.yml down",
+    "docker:infra": "docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d postgres redis minio orthanc ohif"
+  },
+  "devDependencies": {
+    "prettier": "^3.9.6",
+    "turbo": "^2.10.12",
+    "typescript": "~6.0.3"
+  }
+}
