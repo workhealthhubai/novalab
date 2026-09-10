@@ -106,7 +106,8 @@ pnpm docker:infra
 
 # 2. Database
 pnpm db:migrate       # prisma migrate dev (creates/applies migrations, generates client)
-pnpm db:seed          # permissions, demo tenant, system roles, admin user, sample company
+pnpm db:seed          # permissions, demo tenant, system roles, admin user + full demo dataset
+pnpm db:seed:reset    # wipe Postgres/MinIO/Orthanc/Redis, then rebuild the demo dataset (see apps/api/prisma/DEMO_SEED.md)
 
 # 3. Apps (Turborepo runs both in watch mode)
 pnpm dev
@@ -211,6 +212,7 @@ Conventions in `schema.prisma`:
 | `pnpm db:migrate`                           | `prisma migrate dev`                                      |
 | `pnpm db:migrate:deploy`                    | `prisma migrate deploy`                                   |
 | `pnpm db:seed`                              | `prisma db seed` → `apps/api/prisma/seed.ts` (idempotent) |
+| `pnpm db:seed:reset`                        | `SEED_WIPE=true tsx prisma/seed.ts` → deletes all data, re-seeds demo |
 | `pnpm db:studio`                            | Prisma Studio                                             |
 | `pnpm --filter @osgb/api exec prisma <cmd>` | Any other Prisma CLI command                              |
 

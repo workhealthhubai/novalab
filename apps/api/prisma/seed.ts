@@ -1,4 +1,14 @@
 /* eslint-disable no-console */
+/**
+ * Database seed.
+ *
+ *   pnpm db:seed                       # base data + full demo dataset (skipped if demo data exists)
+ *   pnpm db:seed:reset                 # wipe Postgres, MinIO, Orthanc and Redis, then seed everything
+ *   SEED_DEMO=false pnpm db:seed       # base data only (permissions, tenant, roles, admin, locations)
+ *
+ * Base data is idempotent. The demo dataset uses deterministic ids, so re-running after a wipe
+ * always produces the same records and links. See prisma/DEMO_SEED.md for what it contains.
+ */
 import { resolve } from 'node:path';
 import { config as loadEnv } from 'dotenv';
 import { PrismaPg } from '@prisma/adapter-pg';
@@ -7,6 +17,9 @@ import { PERMISSION_DEFINITIONS, SYSTEM_ROLES } from '@osgb/shared-types';
 import { PrismaClient } from '../src/generated/prisma/client';
 import { ROLE_TEMPLATES } from '../src/modules/roles/role-templates';
 import { seedLocations } from './seed-locations';
+import { seedDemo } from './seed/demo';
+import { createOrthanc, createStorage } from './seed/lib';
+import { wipeDatabase, wipeOrthanc, wipeRedis, wipeStorage } from './seed/wipe';
 
 loadEnv({
   path: [resolve(process.cwd(), '.env'), resolve(process.cwd(), '../../.env')],
@@ -22,12 +35,26 @@ const TENANT_NAME = process.env.SEED_TENANT_NAME ?? 'Demo OSGB';
 const TENANT_SLUG = process.env.SEED_TENANT_SLUG ?? 'demo';
 const ADMIN_EMAIL = (process.env.SEED_ADMIN_EMAIL ?? 'admin@demo.local').toLowerCase();
 const ADMIN_PASSWORD = process.env.SEED_ADMIN_PASSWORD ?? 'Admin123!';
+const WIPE = process.env.SEED_WIPE === 'true' || process.argv.includes('--wipe');
+const DEMO = process.env.SEED_DEMO !== 'false' && !process.argv.includes('--no-demo');
 
 async function main(): Promise<void> {
   if (process.env.NODE_ENV === 'production' && ADMIN_PASSWORD === 'Admin123!') {
     throw new Error(
       'Refusing to seed the default admin password in production. Set SEED_ADMIN_PASSWORD.',
     );
+  }
+  if (WIPE && process.env.NODE_ENV === 'production') {
+    throw new Error('SEED_WIPE is not allowed in production.');
+  }
+
+  // 0. Optional clean slate: every table, every stored object, every PACS study, the queues.
+  if (WIPE) {
+    const tables = await wipeDatabase(prisma);
+    console.log(`✔ database wiped (${tables.length} tables truncated)`);
+    await wipeStorage(createStorage());
+    await wipeOrthanc(createOrthanc());
+    await wipeRedis();
   }
 
   // 1. Permission catalogue (global)
@@ -111,63 +138,35 @@ async function main(): Promise<void> {
   });
   console.log(`✔ admin user ${ADMIN_EMAIL}`);
 
-  // 5. Sample customer data (idempotent by name)
-  const company =
-    (await prisma.company.findFirst({
-      where: { tenantId: tenant.id, name: 'Örnek Sanayi A.Ş.' },
-    })) ??
-    (await prisma.company.create({
-      data: {
-        tenantId: tenant.id,
-        name: 'Örnek Sanayi A.Ş.',
-        hazardClass: 'HAZARDOUS',
-        taxNumber: '1234567890',
-        address: 'Organize Sanayi Bölgesi, İstanbul',
-      },
-    }));
-  const workplace =
-    (await prisma.workplace.findFirst({ where: { tenantId: tenant.id, companyId: company.id } })) ??
-    (await prisma.workplace.create({
-      data: {
-        tenantId: tenant.id,
-        companyId: company.id,
-        name: 'Merkez Fabrika',
-        hazardClass: 'HAZARDOUS',
-        employeeCount: 120,
-      },
-    }));
-  const employeeCount = await prisma.employee.count({
-    where: { tenantId: tenant.id, companyId: company.id },
-  });
-  if (employeeCount === 0) {
-    await prisma.employee.createMany({
-      data: [
-        {
-          tenantId: tenant.id,
-          companyId: company.id,
-          workplaceId: workplace.id,
-          firstName: 'Ayşe',
-          lastName: 'Yılmaz',
-          jobTitle: 'Operatör',
-          department: 'Üretim',
-        },
-        {
-          tenantId: tenant.id,
-          companyId: company.id,
-          workplaceId: workplace.id,
-          firstName: 'Mehmet',
-          lastName: 'Kaya',
-          jobTitle: 'Forklift Operatörü',
-          department: 'Lojistik',
-        },
-      ],
-    });
-  }
-  console.log('✔ sample company, workplace and employees');
-
-  // 6. Reference data for addresses (provinces + districts from the bundled file)
+  // 5. Reference data for addresses (provinces + districts from the bundled file)
   await seedLocations(prisma, {
     neighborhoods: process.env.LOCATIONS_FETCH_NEIGHBORHOODS === 'true',
+  });
+
+  // 6. Demo dataset (all modules, interconnected). Not idempotent without a wipe → guarded.
+  if (!DEMO) {
+    console.log('… demo dataset skipped (SEED_DEMO=false)');
+    return;
+  }
+  const existing = await prisma.protocol.count({ where: { tenantId: tenant.id } });
+  if (existing > 0 && !WIPE) {
+    console.log(
+      `… demo dataset skipped: tenant already has ${existing} protocols. Run "pnpm db:seed:reset" to rebuild it from scratch.`,
+    );
+    return;
+  }
+  console.log('— demo dataset');
+  await seedDemo({
+    prisma,
+    tenantId: tenant.id,
+    tenantName: tenant.name,
+    admin: {
+      id: admin.id,
+      email: admin.email,
+      firstName: admin.firstName,
+      lastName: admin.lastName,
+    },
+    password: ADMIN_PASSWORD,
   });
 }
 

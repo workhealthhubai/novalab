@@ -6,6 +6,21 @@
       "runtimeExecutable": "pnpm",
       "runtimeArgs": ["--filter", "@osgb/web", "dev"],
       "port": 5173
+    },
+    {
+      "name": "api",
+      "runtimeExecutable": "sh",
+      "runtimeArgs": ["-c", "API_PORT=3010 pnpm --filter @osgb/api dev"],
+      "port": 3010
+    },
+    {
+      "name": "web-demo",
+      "runtimeExecutable": "sh",
+      "runtimeArgs": [
+        "-c",
+        "VITE_DEV_API_PROXY=http://localhost:3010 pnpm --filter @osgb/web dev -- --port 5174 --strictPort"
+      ],
+      "port": 5174
     }
   ]
 }

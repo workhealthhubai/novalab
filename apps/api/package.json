@@ -20,6 +20,7 @@
     "prisma:migrate:deploy": "prisma migrate deploy",
     "prisma:migrate:reset": "prisma migrate reset",
     "prisma:seed": "prisma db seed",
+    "prisma:seed:reset": "SEED_WIPE=true tsx prisma/seed.ts",
     "prisma:seed:locations": "tsx prisma/seed-locations.ts",
     "prisma:studio": "prisma studio",
     "clean": "rm -rf dist coverage src/generated"
