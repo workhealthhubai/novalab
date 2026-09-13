@@ -97,7 +97,9 @@ export const PATHS = {
   accounting: '/settings/accounting',
   dicomRecords: '/settings/dicom-records',
   subOsgb: '/settings/sub-osgb',
+  tenants: '/settings/tenants',
 } as const;
+
 
 /** Sidebar tree. Order follows the product specification. */
 export const NAV_TREE: NavEntry[] = [
@@ -359,9 +361,17 @@ export const NAV_TREE: NavEntry[] = [
         description: 'İş birliği yapılan OSGB kurumlarının iletişim ve yetki bilgileri.',
         permission: PERMISSIONS.SYSTEM_MANAGE,
       },
+      {
+        path: PATHS.tenants,
+        label: 'OSGB Kiracıları (Multi-Tenant)',
+        icon: Building2,
+        description: 'Sistemde tanımlı bağımsız OSGB kiracıları ve yeni OSGB açma.',
+        permission: PERMISSIONS.TENANTS_MANAGE,
+      },
     ],
   },
 ];
+
 
 export const NAV_LEAVES: NavLeaf[] = NAV_TREE.flatMap((entry) =>
   isNavSection(entry) ? entry.children : [entry],

@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsObject, IsOptional, IsString, Matches, MaxLength, MinLength } from 'class-validator';
+import { IsEmail, IsObject, IsOptional, IsString, Matches, MaxLength, MinLength } from 'class-validator';
 
 export class CreateTenantDto {
   @ApiProperty({ example: 'Acme OSGB' })
@@ -17,4 +17,29 @@ export class CreateTenantDto {
   @IsOptional()
   @IsObject()
   settings?: Record<string, unknown>;
+
+  @ApiPropertyOptional({ example: 'admin@acme.local' })
+  @IsOptional()
+  @IsEmail()
+  adminEmail?: string;
+
+  @ApiPropertyOptional({ example: 'Admin123!' })
+  @IsOptional()
+  @IsString()
+  @MinLength(6)
+  @MaxLength(128)
+  adminPassword?: string;
+
+  @ApiPropertyOptional({ example: 'Ahmet' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(100)
+  adminFirstName?: string;
+
+  @ApiPropertyOptional({ example: 'Yılmaz' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(100)
+  adminLastName?: string;
 }
+

@@ -50,4 +50,8 @@ export const operationsService = {
   }> {
     return unwrap(await apiClient.get('/operations/dashboard'));
   },
+  async remove(kind: OperationKind, id: string): Promise<{ success: boolean }> {
+    return unwrap(await apiClient.delete(`/operations/${kind}/${id}`));
+  },
 };
+

@@ -4,10 +4,11 @@ import { TenantStatus } from '@osgb/shared-types';
 import { CreateTenantDto } from './create-tenant.dto';
 
 export class UpdateTenantDto extends PartialType(
-  PickType(CreateTenantDto, ['name', 'settings'] as const),
+  PickType(CreateTenantDto, ['name', 'slug', 'settings'] as const),
 ) {
   @ApiPropertyOptional({ enum: Object.values(TenantStatus) })
   @IsOptional()
   @IsEnum(TenantStatus)
   status?: TenantStatus;
 }
+

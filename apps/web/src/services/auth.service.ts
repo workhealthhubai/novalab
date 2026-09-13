@@ -28,4 +28,7 @@ export const authService = {
   async me(): Promise<AuthUser> {
     return unwrap(await apiClient.get('/auth/me'));
   },
+  async switchTenant(targetTenantId: string): Promise<LoginResponse> {
+    return unwrap(await apiClient.post('/auth/switch-tenant', { targetTenantId }));
+  },
 };

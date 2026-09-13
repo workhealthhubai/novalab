@@ -1,7 +1,7 @@
 import {
-  ALL_PERMISSIONS,
   PERMISSIONS,
   SYSTEM_ROLES,
+  TENANT_ADMIN_PERMISSIONS,
   type Permission,
   type SystemRole,
 } from '@osgb/shared-types';
@@ -20,7 +20,7 @@ export const ROLE_TEMPLATES: readonly RoleTemplate[] = [
   {
     name: SYSTEM_ROLES.TENANT_ADMIN,
     description: 'Full access to the tenant, including user and role management',
-    permissions: ALL_PERMISSIONS,
+    permissions: TENANT_ADMIN_PERMISSIONS,
   },
   {
     name: SYSTEM_ROLES.OCCUPATIONAL_PHYSICIAN,

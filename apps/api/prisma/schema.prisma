@@ -246,6 +246,7 @@ model User {
   firstName    String
   lastName     String
   status       UserStatus @default(ACTIVE)
+  isSuperAdmin Boolean    @default(false)
   companyId    String?    @db.Uuid
   company      Company?   @relation("CompanyUsers", fields: [tenantId, companyId], references: [tenantId, id], onDelete: Restrict, onUpdate: Cascade)
   lastLoginAt  DateTime?

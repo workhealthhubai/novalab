@@ -39,7 +39,12 @@ describe('JwtStrategy session validation', () => {
   const config = {
     get: jest.fn(() => ({ accessSecret: 'a'.repeat(48), issuer: 'test' })),
   } as unknown as ConfigService<AppConfig, true>;
-  const strategy = new JwtStrategy(config, users, sessions);
+  const prisma = {
+    tenant: {
+      findUnique: jest.fn(),
+    },
+  } as any;
+  const strategy = new JwtStrategy(config, users, sessions, prisma);
 
   beforeEach(() => {
     jest.clearAllMocks();
@@ -48,7 +53,31 @@ describe('JwtStrategy session validation', () => {
   });
 
   it('accepts an access token backed by an active session', async () => {
-    await expect(strategy.validate(payload)).resolves.toEqual({ ...user, sessionId: payload.sid });
+    await expect(strategy.validate(payload)).resolves.toEqual({
+      ...user,
+      originalTenantId: user.tenantId,
+      activeTenantName: undefined,
+      sessionId: payload.sid,
+    });
+  });
+
+  it('allows super admin to validate token for a switched tenant', async () => {
+    const superAdminUser = { ...user, isSuperAdmin: true };
+    const switchedPayload = { ...payload, tid: 'target-tenant-id' };
+    const switchedSession = { ...activeSession, tenantId: 'target-tenant-id' };
+
+    users.findAuthenticatedUser.mockResolvedValue({ user: superAdminUser, tenantStatus: 'ACTIVE' });
+    sessions.findById.mockResolvedValue(switchedSession);
+    prisma.tenant.findUnique.mockResolvedValue({
+      id: 'target-tenant-id',
+      name: 'Ege OSGB',
+      status: 'ACTIVE',
+    });
+
+    const result = await strategy.validate(switchedPayload);
+    expect(result.tenantId).toBe('target-tenant-id');
+    expect(result.originalTenantId).toBe(superAdminUser.tenantId);
+    expect(result.activeTenantName).toBe('Ege OSGB');
   });
 
   it.each([

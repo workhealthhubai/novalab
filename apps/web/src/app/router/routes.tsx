@@ -52,9 +52,11 @@ import { OrganizationPage } from '@/pages/settings/organization-page';
 import { StaffMovementsPage } from '@/pages/settings/staff-movements-page';
 import { StaffPage } from '@/pages/settings/staff-page';
 import { SubOsgbPage } from '@/pages/settings/sub-osgb-page';
+import { TenantsPage } from '@/pages/settings/tenants-page';
 import { TestPackagesPage } from '@/pages/settings/test-packages-page';
 import { TestsPage } from '@/pages/settings/tests-page';
 import { PATHS } from './navigation';
+
 import { PermissionGate } from './permission-gate';
 
 /** Permission-gated application routes. */
@@ -128,8 +130,10 @@ export const routes: RouteObject[] = [
           { path: PATHS.accounting, element: <AccountingPage /> },
           { path: PATHS.dicomRecords, element: <DicomRecordsPage /> },
           { path: PATHS.subOsgb, element: <SubOsgbPage /> },
+          { path: PATHS.tenants, element: <TenantsPage /> },
         ],
       },
+
     ],
   },
   { path: '*', element: <NotFoundPage /> },

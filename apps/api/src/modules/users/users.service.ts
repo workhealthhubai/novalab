@@ -52,6 +52,11 @@ export function toAuthenticatedUser(user: UserWithAccess): AuthenticatedUser {
     for (const permission of permissions)
       if (!allowed.has(permission)) permissions.delete(permission);
   }
+  if (user.isSuperAdmin) {
+    permissions.add(PERMISSIONS.TENANTS_MANAGE);
+  } else {
+    permissions.delete(PERMISSIONS.TENANTS_MANAGE);
+  }
   return {
     id: user.id,
     tenantId: user.tenantId,
@@ -63,6 +68,7 @@ export function toAuthenticatedUser(user: UserWithAccess): AuthenticatedUser {
     companyAccessActive: Boolean(user.company && !user.company.deletedAt),
     roles,
     permissions: [...permissions].sort() as Permission[],
+    isSuperAdmin: Boolean(user.isSuperAdmin),
   };
 }
 

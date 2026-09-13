@@ -87,6 +87,7 @@ export const PERMISSIONS = {
   AUDIT_READ: 'audit.read',
 
   SYSTEM_MANAGE: 'system.manage',
+  TENANTS_MANAGE: 'tenants.manage',
 } as const;
 
 export type Permission = (typeof PERMISSIONS)[keyof typeof PERMISSIONS];
@@ -369,9 +370,18 @@ export const PERMISSION_DEFINITIONS: readonly PermissionDefinition[] = [
     category: 'system',
     description: 'Manage system-level settings and tenants',
   },
+  {
+    key: PERMISSIONS.TENANTS_MANAGE,
+    category: 'system',
+    description: 'Manage independent OSGB tenants across the platform (Super Admin)',
+  },
 ];
 
 export const ALL_PERMISSIONS: readonly Permission[] = PERMISSION_DEFINITIONS.map((p) => p.key);
+
+export const TENANT_ADMIN_PERMISSIONS: readonly Permission[] = ALL_PERMISSIONS.filter(
+  (p) => p !== PERMISSIONS.TENANTS_MANAGE,
+);
 
 export const MEDICAL_PERMISSIONS: readonly Permission[] = PERMISSION_DEFINITIONS.filter(
   (p) => p.medical,

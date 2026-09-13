@@ -1,4 +1,14 @@
-import { Body, Controller, Get, Param, ParseUUIDPipe, Post, Put, Query } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  ParseUUIDPipe,
+  Post,
+  Put,
+  Query,
+} from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { CompanyScoped } from '@/common/decorators/company-scoped.decorator';
 import { CurrentUser } from '@/common/decorators';
@@ -53,4 +63,12 @@ export class OperationsController {
   ) {
     return this.service.save(actor, kind, dto, id);
   }
+  @Delete(':kind/:id') remove(
+    @CurrentUser() actor: AuthenticatedUser,
+    @Param('kind') kind: string,
+    @Param('id', new ParseUUIDPipe()) id: string,
+  ) {
+    return this.service.remove(actor, kind, id);
+  }
 }
+

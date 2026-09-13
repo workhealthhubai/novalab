@@ -26,6 +26,11 @@ export interface AuthUser {
   companyAccessActive?: boolean;
   roles: string[];
   permissions: Permission[];
+  isSuperAdmin?: boolean;
+  /** Home tenant of the user when acting in another tenant via super admin switch. */
+  originalTenantId?: string;
+  /** Name of the active tenant when switched. */
+  activeTenantName?: string;
 }
 
 export interface LoginResponse extends TokenPair {
@@ -38,4 +43,8 @@ export interface RefreshRequest {
 
 export interface LogoutRequest {
   refreshToken: string;
+}
+
+export interface SwitchTenantRequest {
+  targetTenantId: string;
 }

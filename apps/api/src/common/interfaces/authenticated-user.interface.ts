@@ -16,6 +16,11 @@ export interface AuthenticatedUser {
   companyAccessActive?: boolean;
   roles: string[];
   permissions: Permission[];
+  isSuperAdmin?: boolean;
+  /** Home tenant of the user when acting in another tenant via super admin switch. */
+  originalTenantId?: string;
+  /** Name of the active tenant when switched. */
+  activeTenantName?: string;
   /** Refresh session behind this access token (present on tokens issued after sessions were added). */
   sessionId?: string;
 }

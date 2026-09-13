@@ -10,11 +10,23 @@ export class TenantsRepository {
     return this.prisma.tenant.findFirst({ where: { id, deletedAt: null } });
   }
 
+  findBySlug(slug: string): Promise<Tenant | null> {
+    return this.prisma.tenant.findFirst({ where: { slug, deletedAt: null } });
+  }
+
   findMany(skip: number, take: number) {
     return this.prisma.$transaction([
       this.prisma.tenant.findMany({
         where: { deletedAt: null },
-        orderBy: { createdAt: 'asc' },
+        include: {
+          _count: {
+            select: {
+              users: { where: { deletedAt: null } },
+              companies: { where: { deletedAt: null } },
+            },
+          },
+        },
+        orderBy: { createdAt: 'desc' },
         skip,
         take,
       }),
@@ -29,4 +41,12 @@ export class TenantsRepository {
   update(id: string, data: Prisma.TenantUpdateInput): Promise<Tenant> {
     return this.prisma.tenant.update({ where: { id }, data });
   }
+
+  softDelete(id: string): Promise<Tenant> {
+    return this.prisma.tenant.update({
+      where: { id },
+      data: { deletedAt: new Date() },
+    });
+  }
 }
+

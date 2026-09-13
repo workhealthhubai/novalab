@@ -115,6 +115,7 @@ export const PERMISSION_LABELS: Record<Permission, string> = {
   'reports.export': 'Rapor dışa aktar',
   'audit.read': 'Denetim kayıtlarını görüntüle',
   'system.manage': 'Sistem ayarlarını yönet',
+  'tenants.manage': 'Tüm OSGB kiracılarını yönet (Süper Admin)',
 };
 
 export interface PermissionGroup {

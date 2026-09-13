@@ -1,5 +1,11 @@
 import { createHash, randomUUID } from 'node:crypto';
-import { BadRequestException, Injectable, UnauthorizedException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { PinoLogger } from 'nestjs-pino';
@@ -168,8 +174,28 @@ export class AuthService {
       });
     }
 
+    let activeUser = resolved.user;
+    if (resolved.user.isSuperAdmin && session.tenantId !== resolved.user.tenantId) {
+      const targetTenant = await this.prisma.tenant.findUnique({
+        where: { id: session.tenantId, deletedAt: null },
+        select: { id: true, name: true, status: true },
+      });
+      if (!targetTenant || targetTenant.status !== 'ACTIVE') {
+        throw new UnauthorizedException({
+          message: 'Target tenant is suspended or not found',
+          errorCode: 'TENANT_SUSPENDED',
+        });
+      }
+      activeUser = {
+        ...resolved.user,
+        tenantId: session.tenantId,
+        originalTenantId: resolved.user.tenantId,
+        activeTenantName: targetTenant.name,
+      };
+    }
+
     try {
-      return await this.issueTokenPair(resolved.user, ctx, {
+      return await this.issueTokenPair(activeUser, ctx, {
         id: session.id,
         tokenHash: presentedHash,
       });
@@ -179,6 +205,62 @@ export class AuthService {
       }
       throw error;
     }
+  }
+
+  async switchTenant(
+    actor: AuthenticatedUser,
+    targetTenantId: string,
+    ctx: RequestContext,
+  ): Promise<LoginResponse> {
+    if (!actor.isSuperAdmin) {
+      throw new ForbiddenException({
+        message: 'Only Super Admin can switch between OSGB tenants',
+        errorCode: 'SUPER_ADMIN_REQUIRED',
+      });
+    }
+
+    const resolved = await this.users.findAuthenticatedUser(actor.id);
+    if (!resolved || resolved.user.status !== 'ACTIVE') {
+      throw new UnauthorizedException('User account is not active');
+    }
+
+    const targetTenant = await this.prisma.tenant.findUnique({
+      where: { id: targetTenantId, deletedAt: null },
+      select: { id: true, name: true, status: true, slug: true },
+    });
+    if (!targetTenant || targetTenant.status !== 'ACTIVE') {
+      throw new NotFoundException({
+        message: 'Target OSGB tenant not found or inactive',
+        errorCode: 'TENANT_NOT_FOUND',
+      });
+    }
+
+    const isHomeTenant = targetTenant.id === resolved.user.tenantId;
+    const switchedUser: AuthenticatedUser = {
+      ...resolved.user,
+      tenantId: targetTenant.id,
+      originalTenantId: resolved.user.tenantId,
+      activeTenantName: isHomeTenant ? undefined : targetTenant.name,
+    };
+
+    const tokens = await this.issueTokenPair(switchedUser, ctx);
+
+    await this.audit.log({
+      tenantId: targetTenant.id,
+      userId: actor.id,
+      action: AuditAction.LOGIN,
+      entityType: 'Tenant',
+      entityId: targetTenant.id,
+      newValue: {
+        action: isHomeTenant ? 'SWITCH_BACK_TO_HOME_TENANT' : 'SWITCH_TENANT_CONTEXT',
+        targetTenantName: targetTenant.name,
+        targetTenantSlug: targetTenant.slug,
+        homeTenantId: resolved.user.tenantId,
+      },
+      ...ctx,
+    });
+
+    return { ...tokens, user: switchedUser };
   }
 
   async logout(refreshToken: string, ctx: RequestContext): Promise<void> {

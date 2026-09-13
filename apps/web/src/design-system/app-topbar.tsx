@@ -1,6 +1,17 @@
 import { SYSTEM_ROLES } from '@osgb/shared-types';
-import { useQuery } from '@tanstack/react-query';
-import { Bell, Building, CheckCheck, LogOut, Menu, UserRound } from 'lucide-react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import {
+  Bell,
+  Building,
+  Check,
+  CheckCheck,
+  ChevronDown,
+  LogOut,
+  Menu,
+  RotateCcw,
+  ShieldCheck,
+  UserRound,
+} from 'lucide-react';
 import { useState } from 'react';
 import { useLocation, useNavigate } from 'react-router';
 import { findNavLeaf, findNavSection, PATHS } from '@/app/router/navigation';
@@ -16,7 +27,10 @@ import { Sheet, SheetContent, SheetTitle, SheetTrigger } from '@/components/ui/s
 import { useAuth, useLogout } from '@/hooks/use-auth';
 import { useNotificationMutations, useNotifications } from '@/hooks/use-notifications';
 import { initials } from '@/lib/utils';
+import { authService } from '@/services/auth.service';
 import { tenantsService } from '@/services/tenants.service';
+import { useAuthStore } from '@/stores/auth.store';
+import { toast } from '@/design-system/toast';
 import { AppSidebar } from './app-sidebar';
 
 /**
@@ -26,6 +40,7 @@ import { AppSidebar } from './app-sidebar';
 export function AppTopbar() {
   const location = useLocation();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const { user } = useAuth();
   const companyAccount =
     Boolean(user?.companyId) || Boolean(user?.roles.includes(SYSTEM_ROLES.COMPANY_REPRESENTATIVE));
@@ -39,6 +54,37 @@ export function AppTopbar() {
     staleTime: 5 * 60_000,
     enabled: !companyAccount,
   });
+
+  const isSwitched = Boolean(
+    user?.isSuperAdmin &&
+      user?.originalTenantId &&
+      user?.tenantId !== user?.originalTenantId,
+  );
+
+  const tenantsList = useQuery({
+    queryKey: ['tenants', 'switcher-list'],
+    queryFn: () => tenantsService.list(1, 100),
+    enabled: Boolean(user?.isSuperAdmin),
+    staleTime: 60_000,
+  });
+
+  const handleSwitchTenant = async (targetTenantId: string) => {
+    try {
+      const resp = await authService.switchTenant(targetTenantId);
+      const remember = useAuthStore.getState().remember;
+      useAuthStore.getState().setSession(resp, resp.user, remember);
+      await queryClient.clear();
+      toast.success(
+        resp.user.activeTenantName
+          ? `"${resp.user.activeTenantName}" kurumuna geçildi`
+          : 'Ana kurumunuza dönüldü',
+      );
+      void navigate(location.pathname);
+    } catch (err) {
+      toast.error('Kurum geçişi yapılamadı: ' + (err instanceof Error ? err.message : 'Hata oluştu'));
+    }
+  };
+
   const notifications = useNotifications(!companyAccount);
   const { markRead, markAllRead } = useNotificationMutations();
 
@@ -83,18 +129,102 @@ export function AppTopbar() {
       </nav>
 
       <div className="ml-auto flex items-center gap-1.5 sm:gap-2">
-        {/* Active tenant. Switching between tenants is a Phase 3 concern (one tenant per session today). */}
-        <div
-          className="hidden h-control-sm items-center gap-2 rounded-full border border-border bg-card pr-3 pl-3 text-sm font-medium md:inline-flex"
-          title="Aktif kurum"
-        >
-          <Building className="size-4 text-muted-foreground" aria-hidden />
-          <span className="max-w-40 truncate">
-            {companyAccount
-              ? 'Firma hesabı'
-              : (tenant.data?.name ?? (tenant.isPending ? '…' : 'Kurum'))}
-          </span>
-        </div>
+        {/* Impersonation Indicator Pill */}
+        {isSwitched ? (
+          <div className="hidden lg:flex items-center gap-2 rounded-full border border-amber-500/40 bg-amber-500/15 px-3 py-1 text-xs font-semibold text-amber-800 dark:text-amber-200 shadow-sm animate-in fade-in">
+            <span className="relative flex size-2">
+              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-amber-400 opacity-75" />
+              <span className="relative inline-flex size-2 rounded-full bg-amber-500" />
+            </span>
+            <span>
+              Yönetilen Kurum: <strong>{tenant.data?.name ?? user?.activeTenantName}</strong>
+            </span>
+            <button
+              type="button"
+              onClick={() => handleSwitchTenant(user!.originalTenantId!)}
+              className="ml-1 rounded px-1.5 py-0.5 font-bold underline hover:bg-amber-500/20 cursor-pointer"
+              title="Kendi kurumunuza geri dönün"
+            >
+              Geri Dön
+            </button>
+          </div>
+        ) : null}
+
+        {/* Active tenant badge / Super Admin switcher */}
+        {user?.isSuperAdmin ? (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button
+                type="button"
+                className={`hidden h-control-sm items-center gap-2 rounded-full border px-3 text-sm font-medium transition-colors md:inline-flex ${
+                  isSwitched
+                    ? 'border-amber-500/50 bg-amber-500/10 text-amber-900 dark:text-amber-200 hover:bg-amber-500/20'
+                    : 'border-border bg-card hover:bg-accent text-foreground'
+                }`}
+                title="OSGB Değiştir (Süper Admin)"
+              >
+                {isSwitched ? (
+                  <ShieldCheck className="size-4 text-amber-600 dark:text-amber-400" />
+                ) : (
+                  <Building className="size-4 text-muted-foreground" aria-hidden />
+                )}
+                <span className="max-w-40 truncate">
+                  {tenant.data?.name ?? user?.activeTenantName ?? 'Kurum'}
+                </span>
+                <ChevronDown className="size-3.5 text-muted-foreground opacity-70" />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-64">
+              <div className="px-2.5 py-1.5">
+                <p className="text-xs font-semibold text-foreground">OSGB Değiştir (Süper Admin)</p>
+                <p className="text-[11px] text-muted-foreground">Geçiş yapmak istediğiniz kurumu seçin</p>
+              </div>
+              <DropdownMenuSeparator />
+              {isSwitched && user.originalTenantId ? (
+                <>
+                  <DropdownMenuItem
+                    className="font-medium text-amber-700 dark:text-amber-300"
+                    onSelect={() => handleSwitchTenant(user.originalTenantId!)}
+                  >
+                    <RotateCcw className="size-4 mr-1.5" />
+                    Ana Kurumuma Dön
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                </>
+              ) : null}
+              {tenantsList.data?.items.map((t) => {
+                const isActive = t.id === user?.tenantId;
+                return (
+                  <DropdownMenuItem
+                    key={t.id}
+                    className="flex items-center justify-between py-2 cursor-pointer"
+                    onSelect={() => {
+                      if (!isActive) handleSwitchTenant(t.id);
+                    }}
+                  >
+                    <div className="min-w-0 pr-2">
+                      <p className="truncate text-sm font-medium">{t.name}</p>
+                      <p className="text-xs text-muted-foreground">slug: {t.slug}</p>
+                    </div>
+                    {isActive ? <Check className="size-4 text-primary shrink-0" /> : null}
+                  </DropdownMenuItem>
+                );
+              })}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        ) : (
+          <div
+            className="hidden h-control-sm items-center gap-2 rounded-full border border-border bg-card pr-3 pl-3 text-sm font-medium md:inline-flex"
+            title="Aktif kurum"
+          >
+            <Building className="size-4 text-muted-foreground" aria-hidden />
+            <span className="max-w-40 truncate">
+              {companyAccount
+                ? 'Firma hesabı'
+                : (tenant.data?.name ?? (tenant.isPending ? '…' : 'Kurum'))}
+            </span>
+          </div>
+        )}
 
         {!companyAccount ? (
           <DropdownMenu>

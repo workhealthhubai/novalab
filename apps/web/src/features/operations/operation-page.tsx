@@ -19,7 +19,9 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { Trash2 } from 'lucide-react';
 import { AppButton } from '@/design-system/app-button';
+import { ConfirmDialog } from '@/design-system/confirm-dialog';
 import { DateRangePicker, type DateRangeValue } from '@/design-system/date-range-picker';
 import { PageHeader } from '@/design-system/page-header';
 import { EmptyState } from '@/design-system/empty-state';
@@ -33,6 +35,7 @@ import { formatDate } from '@/features/patients/patient-utils';
 import { toApiError } from '@/services/api-client';
 import { operationsService } from '@/services/operations.service';
 import { PATHS } from '@/app/router/navigation';
+
 
 const selectClass = 'h-10 w-full rounded-md border border-input bg-card px-3 text-sm';
 const formatMoney = (cents: number) =>
@@ -198,6 +201,19 @@ export function OperationPage({ kind }: { kind: OperationKind }) {
     },
     onError: (e) => setError(toApiError(e).message),
   });
+
+  const [recordToDelete, setRecordToDelete] = useState<OperationRecord | null>(null);
+  const removeMutation = useMutation({
+    mutationFn: (id: string) => operationsService.remove(kind, id),
+    onSuccess: () => {
+      setRecordToDelete(null);
+      void client.invalidateQueries({ queryKey: ['operations'] });
+      void client.invalidateQueries({ queryKey: ['protocols'] });
+      toast.success('Kayıt silindi');
+    },
+    onError: (e) => toast.error(toApiError(e).message),
+  });
+
   const readOnly = !can(definition.write) || (editing !== null && locked(kind, editing.status));
   const monetary = kind === 'accounting' || kind === 'payouts';
   const updateField = (key: string, value: string) =>
@@ -507,24 +523,37 @@ export function OperationPage({ kind }: { kind: OperationKind }) {
                           </TableCell>
                         )}
                         <TableCell>
-                          <AppButton
-                            variant="secondary"
-                            size="sm"
-                            onClick={() => {
-                              setEditing(record);
-                              setForm({
-                                title: record.title,
-                                date: record.date.slice(0, 10),
-                                status: record.status,
-                                fields: record.fields,
-                                version: record.version,
-                              });
-                              setError('');
-                              setOpen(true);
-                            }}
-                          >
-                            Aç
-                          </AppButton>
+                          <div className="flex items-center gap-1.5">
+                            <AppButton
+                              variant="secondary"
+                              size="sm"
+                              onClick={() => {
+                                setEditing(record);
+                                setForm({
+                                  title: record.title,
+                                  date: record.date.slice(0, 10),
+                                  status: record.status,
+                                  fields: record.fields,
+                                  version: record.version,
+                                });
+                                setError('');
+                                setOpen(true);
+                              }}
+                            >
+                              Aç
+                            </AppButton>
+                            {can(definition.write) && !locked(kind, record.status) && (
+                              <AppButton
+                                variant="secondary"
+                                size="sm"
+                                className="text-destructive hover:bg-destructive-soft hover:text-destructive"
+                                onClick={() => setRecordToDelete(record)}
+                                title="Kaydı Sil"
+                              >
+                                <Trash2 className="size-4" />
+                              </AppButton>
+                            )}
+                          </div>
                         </TableCell>
                       </TableRow>
                     ))}
@@ -536,6 +565,20 @@ export function OperationPage({ kind }: { kind: OperationKind }) {
           </div>
         )
       )}
+      <ConfirmDialog
+        open={Boolean(recordToDelete)}
+        onOpenChange={(isOpen) => !isOpen && setRecordToDelete(null)}
+        title={`${recordToDelete?.title || 'Kayıt'} Silinsin mi?`}
+        description="Bu kaydı silmek istediğinizden emin misiniz? Bu işlem geri alınamaz."
+        confirmLabel="Evet, Sil"
+        loading={removeMutation.isPending}
+        onConfirm={() => {
+          if (recordToDelete) {
+            removeMutation.mutate(recordToDelete.id);
+          }
+        }}
+      />
     </>
   );
 }
+

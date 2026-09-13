@@ -335,4 +335,30 @@ export class OperationsService {
     ]);
     return { patients, companies, protocols, reports };
   }
+
+  async remove(actor: AuthenticatedUser, rawKind: string, id: string) {
+    const kind = await this.authorize(actor, rawKind, true);
+    const tenantId = actor.tenantId;
+    const record = await this.prisma.operationRecord.findFirst({
+      where: { id, tenantId, kind, deletedAt: null },
+    });
+    if (!record) throw new NotFoundException('Kayıt bulunamadı.');
+    if (isLocked(kind, record.status)) {
+      throw new ConflictException('Kesinleşmiş veya kilitli kayıt silinemez.');
+    }
+    await this.prisma.operationRecord.update({
+      where: { id },
+      data: { deletedAt: new Date() },
+    });
+    await this.audit.log({
+      tenantId,
+      userId: actor.id,
+      action: AuditAction.DELETE,
+      entityType: `Operation:${kind}`,
+      entityId: id,
+      oldValue: { title: record.title, status: record.status },
+    });
+    return { success: true };
+  }
 }
+

@@ -34,6 +34,7 @@ describe('OperationsService', () => {
       updateMany: jest.fn(),
       findFirstOrThrow: jest.fn(),
       create: jest.fn(),
+      update: jest.fn(),
     },
     protocol: { updateMany: jest.fn() },
     protocolItem: { findFirst: jest.fn(), update: jest.fn() },
@@ -124,4 +125,19 @@ describe('OperationsService', () => {
     ).rejects.toBeInstanceOf(ConflictException);
     expect(tx.operationRecord.updateMany).not.toHaveBeenCalled();
   });
+  it('soft deletes operation record when authorized and not locked', async () => {
+    prisma.operationRecord.findFirst.mockResolvedValue({
+      id: 'sub-osgb-1',
+      title: 'Partner OSGB',
+      status: 'Aktif',
+    });
+    prisma.operationRecord.update.mockResolvedValue({});
+    const res = await service.remove(actor, 'sub-osgb', 'sub-osgb-1');
+    expect(res).toEqual({ success: true });
+    expect(prisma.operationRecord.update).toHaveBeenCalledWith({
+      where: { id: 'sub-osgb-1' },
+      data: { deletedAt: expect.any(Date) },
+    });
+  });
 });
+

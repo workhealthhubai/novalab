@@ -25,6 +25,7 @@ import { parseCookies } from '@/common/utils/cookies';
 import { AuthService, DICOMWEB_COOKIE } from './auth.service';
 import { LoginDto } from './dto/login.dto';
 import { RefreshTokenDto } from './dto/refresh-token.dto';
+import { SwitchTenantDto } from './dto/switch-tenant.dto';
 
 @ApiTags('auth')
 @SkipAudit() // login/refresh/logout are audited explicitly by AuthService (LOGIN, LOGIN_FAILED, LOGOUT, TOKEN_REUSE_DETECTED)
@@ -85,6 +86,18 @@ export class AuthController {
   @ApiOperation({ summary: 'Current principal with roles and permissions' })
   me(@CurrentUser() user: AuthenticatedUser): AuthenticatedUser {
     return user;
+  }
+
+  @Post('switch-tenant')
+  @ApiBearerAuth()
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Switch active tenant context (Super Admin only)' })
+  switchTenant(
+    @CurrentUser() actor: AuthenticatedUser,
+    @Body() dto: SwitchTenantDto,
+    @Req() req: RequestWithUser,
+  ) {
+    return this.auth.switchTenant(actor, dto.targetTenantId, extractRequestContext(req));
   }
 
   /**
