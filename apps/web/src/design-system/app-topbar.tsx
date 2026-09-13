@@ -73,7 +73,7 @@ export function AppTopbar() {
       const resp = await authService.switchTenant(targetTenantId);
       const remember = useAuthStore.getState().remember;
       useAuthStore.getState().setSession(resp, resp.user, remember);
-      await queryClient.clear();
+      queryClient.clear();
       toast.success(
         resp.user.activeTenantName
           ? `"${resp.user.activeTenantName}" kurumuna geçildi`
@@ -141,7 +141,7 @@ export function AppTopbar() {
             </span>
             <button
               type="button"
-              onClick={() => handleSwitchTenant(user!.originalTenantId!)}
+              onClick={() => void handleSwitchTenant(user!.originalTenantId!)}
               className="ml-1 rounded px-1.5 py-0.5 font-bold underline hover:bg-amber-500/20 cursor-pointer"
               title="Kendi kurumunuza geri dönün"
             >
@@ -184,7 +184,7 @@ export function AppTopbar() {
                 <>
                   <DropdownMenuItem
                     className="font-medium text-amber-700 dark:text-amber-300"
-                    onSelect={() => handleSwitchTenant(user.originalTenantId!)}
+                    onSelect={() => void handleSwitchTenant(user.originalTenantId!)}
                   >
                     <RotateCcw className="size-4 mr-1.5" />
                     Ana Kurumuma Dön
@@ -199,7 +199,7 @@ export function AppTopbar() {
                     key={t.id}
                     className="flex items-center justify-between py-2 cursor-pointer"
                     onSelect={() => {
-                      if (!isActive) handleSwitchTenant(t.id);
+                      if (!isActive) void handleSwitchTenant(t.id);
                     }}
                   >
                     <div className="min-w-0 pr-2">

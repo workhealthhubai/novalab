@@ -31,12 +31,15 @@ describe('toAuthenticatedUser', () => {
           name: SYSTEM_ROLES.TENANT_ADMIN,
           tenantId: 'tenant-1',
           description: '',
+          isSystem: true,
           createdAt: new Date(),
           updatedAt: new Date(),
           rolePermissions: [
             {
+              id: 'rp-1',
+              createdAt: new Date(),
               roleId: 'role-1',
-              permissionKey: PERMISSIONS.SYSTEM_MANAGE,
+              permissionId: 'perm-1',
               permission: { key: PERMISSIONS.SYSTEM_MANAGE },
             },
           ],
@@ -53,17 +56,20 @@ describe('toAuthenticatedUser', () => {
   });
 
   it('strips TENANTS_MANAGE if present in role for non-superadmin', () => {
+    const userRole = baseUser.userRoles[0]!;
     const userWithSneakyPermission: UserWithAccess = {
       ...baseUser,
       userRoles: [
         {
-          ...baseUser.userRoles[0],
+          ...userRole,
           role: {
-            ...baseUser.userRoles[0].role,
+            ...userRole.role,
             rolePermissions: [
               {
+                id: 'rp-2',
+                createdAt: new Date(),
                 roleId: 'role-1',
-                permissionKey: PERMISSIONS.TENANTS_MANAGE,
+                permissionId: 'perm-2',
                 permission: { key: PERMISSIONS.TENANTS_MANAGE },
               },
             ],

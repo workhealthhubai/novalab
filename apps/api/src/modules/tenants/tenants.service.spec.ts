@@ -28,7 +28,7 @@ describe('TenantsService', () => {
   };
 
   const ctx: RequestContext = {
-    ip: '127.0.0.1',
+    ipAddress: '127.0.0.1',
     userAgent: 'test-agent',
   };
 

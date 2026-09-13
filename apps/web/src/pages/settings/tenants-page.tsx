@@ -186,7 +186,7 @@ export function TenantsPage() {
       const resp = await authService.switchTenant(t.id);
       const remember = useAuthStore.getState().remember;
       useAuthStore.getState().setSession(resp, resp.user, remember);
-      await queryClient.clear();
+      queryClient.clear();
       toast.success(
         resp.user.activeTenantName
           ? `"${resp.user.activeTenantName}" kurumuna geçildi`
@@ -373,7 +373,7 @@ export function TenantsPage() {
                               variant="secondary"
                               size="sm"
                               className="text-primary hover:bg-primary-soft"
-                              onClick={() => handleSwitchToTenant(t)}
+                              onClick={() => void handleSwitchToTenant(t)}
                               title="Bu kurumun paneline ve verilerine geçiş yapın"
                             >
                               <ArrowLeftRight className="mr-1 size-3.5" />
