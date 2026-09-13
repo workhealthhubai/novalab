@@ -10,6 +10,7 @@ import { AuditService } from '@/modules/audit/audit.service';
 import { MEDICAL_DATA_KEY, type MedicalDataOptions } from '../decorators/medical-data.decorator';
 import type { RequestWithUser } from '../interfaces/request-with-user.interface';
 import { extractRequestContext } from '../interfaces/request-with-user.interface';
+import { safeRequestPath } from '../utils/safe-request-path';
 
 /**
  * Extra gate for handlers marked with @MedicalData().
@@ -46,13 +47,14 @@ export class MedicalDataGuard implements CanActivate {
 
     const params = request.params as Record<string, string | undefined>;
     const entityId = params[options.idParam ?? 'id'];
+    const routePath = (request.route as { path?: string } | undefined)?.path ?? request.path;
     await this.audit.log({
       tenantId: user.tenantId,
       userId: user.id,
       action: AuditAction.MEDICAL_DATA_ACCESS,
       entityType: options.entityType,
       entityId: entityId ?? null,
-      newValue: { method: request.method, path: request.originalUrl },
+      newValue: { method: request.method, path: safeRequestPath(routePath) },
       ...extractRequestContext(request),
     });
     return true;

@@ -26,7 +26,7 @@ import { CONSENT_TYPE_LABELS, SUMMARY_STATE } from '@/features/consents/consent-
 import { useConsentSummary, useConsentTemplates } from '@/features/consents/use-consents';
 import { usePermissions } from '@/hooks/use-permissions';
 import { StatusBadge } from '@/design-system/status-badge';
-import { FITNESS_DECISION } from '@/features/examinations/examination-labels';
+import { EXAMINATION_STATUS } from '@/features/examinations/examination-labels';
 import type { ConsentType } from '@osgb/shared-types';
 import { toApiError } from '@/services/api-client';
 import type { Patient } from '@/types/patient';
@@ -109,7 +109,7 @@ export function PatientDetailPage() {
     <>
       <PageHeader
         title={`${p.firstName} ${p.lastName}`}
-        description={p.notes ? `⚠ ${p.notes}` : undefined}
+        description={p.notes ? `İdari not: ${p.notes}` : undefined}
         breadcrumbs={breadcrumbs}
         actions={
           <>
@@ -199,7 +199,7 @@ export function PatientDetailPage() {
             <Field label="Oluşturulma" value={formatDateTime(p.createdAt)} />
             <Field label="Son güncelleme" value={formatDateTime(p.updatedAt)} />
             <div className="col-span-2">
-              <Field label="Uyarı / Açıklama" value={p.notes} />
+              <Field label="İdari not" value={p.notes} />
             </div>
           </dl>
         </SectionCard>
@@ -290,8 +290,8 @@ export function PatientDetailPage() {
                   <span className="ml-auto flex items-center gap-1.5">
                     {protocol.examinations[0] ? (
                       <StatusBadge
-                        status={FITNESS_DECISION[protocol.examinations[0].fitnessDecision].status}
-                        label={FITNESS_DECISION[protocol.examinations[0].fitnessDecision].label}
+                        status={EXAMINATION_STATUS[protocol.examinations[0].status].status}
+                        label={EXAMINATION_STATUS[protocol.examinations[0].status].label}
                       />
                     ) : null}
                     <ProtocolStatusBadge value={protocol.status} />

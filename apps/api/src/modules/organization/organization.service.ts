@@ -181,6 +181,7 @@ export class OrganizationService {
       website: profile.website,
       addressProvinceId: profile.addressProvinceId,
       addressDistrictId: profile.addressDistrictId,
+      radiologyStationAet: profile.radiologyStationAet,
     };
   }
 }

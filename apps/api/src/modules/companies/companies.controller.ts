@@ -11,6 +11,7 @@ import {
   Query,
   Req,
 } from '@nestjs/common';
+import { CompanyScoped } from '@/common/decorators/company-scoped.decorator';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { PERMISSIONS } from '@osgb/shared-types';
 import { CurrentTenant, CurrentUser, RequirePermissions } from '@/common/decorators';
@@ -32,15 +33,25 @@ export class CompaniesController {
   constructor(private readonly companies: CompaniesService) {}
 
   @Get()
+  @CompanyScoped()
   @RequirePermissions(PERMISSIONS.COMPANIES_READ)
-  list(@CurrentTenant() tenantId: string, @Query() query: CompanyQueryDto) {
-    return this.companies.list(tenantId, query);
+  list(
+    @CurrentTenant() tenantId: string,
+    @CurrentUser() actor: AuthenticatedUser,
+    @Query() query: CompanyQueryDto,
+  ) {
+    return this.companies.list(tenantId, query, actor);
   }
 
   @Get(':id')
+  @CompanyScoped()
   @RequirePermissions(PERMISSIONS.COMPANIES_READ)
-  get(@CurrentTenant() tenantId: string, @Param() { id }: IdParamDto) {
-    return this.companies.get(tenantId, id);
+  get(
+    @CurrentTenant() tenantId: string,
+    @CurrentUser() actor: AuthenticatedUser,
+    @Param() { id }: IdParamDto,
+  ) {
+    return this.companies.get(tenantId, id, actor);
   }
 
   @Post()

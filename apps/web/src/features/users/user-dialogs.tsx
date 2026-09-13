@@ -18,6 +18,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { useCompany, useCompanyPage } from '@/features/companies/use-companies';
 import { AppButton } from '@/design-system/app-button';
 import { FormField } from '@/design-system/form-field';
 import { toApiError } from '@/services/api-client';
@@ -58,7 +59,7 @@ function DialogShell({
   const apiError = error ? toApiError(error) : null;
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-[560px] gap-5" showCloseButton>
+      <DialogContent className="max-h-[90dvh] max-w-[560px] gap-5 overflow-y-auto" showCloseButton>
         <DialogHeader>
           <DialogTitle>{title}</DialogTitle>
           {description ? <DialogDescription>{description}</DialogDescription> : null}
@@ -139,6 +140,64 @@ function RoleChecklist({
   );
 }
 
+function CompanyScopeField({
+  value,
+  onChange,
+  id,
+  disabled,
+}: {
+  value?: string | null;
+  onChange: (value: string | null) => void;
+  id: string;
+  disabled?: boolean;
+}) {
+  const [search, setSearch] = useState('');
+  const companies = useCompanyPage({ pageSize: 50, search: search || undefined });
+  const selected = useCompany(value ?? undefined);
+  const options = new Map(
+    (companies.data?.items ?? []).map((company) => [company.id, company.name]),
+  );
+  if (selected.data) options.set(selected.data.id, selected.data.name);
+  return (
+    <FormField
+      id={id}
+      label="Firma erişim kapsamı"
+      className="sm:col-span-2"
+      hint="Firma temsilcisine bir firma atayın. Atanmamış temsilci veri göremez. Firma atanan hesap ek rolleri olsa da yalnızca bu firmanın izin verilen kayıtlarını okuyabilir."
+    >
+      <Input
+        aria-label="Erişim verilecek firmayı ara"
+        placeholder="Firma adına göre ara…"
+        value={search}
+        onChange={(event) => setSearch(event.target.value)}
+        disabled={disabled}
+      />
+      <Select
+        value={value ?? '__none'}
+        onValueChange={(next) => onChange(next === '__none' ? null : next)}
+        disabled={disabled}
+      >
+        <SelectTrigger id={id}>
+          <SelectValue placeholder="Firma seçin" />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="__none">Firma atanmamış</SelectItem>
+          {[...options].map(([key, name]) => (
+            <SelectItem key={key} value={key}>
+              {name}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+      {companies.isError ? (
+        <p role="alert" className="text-sm text-destructive">
+          Firma listesi yüklenemedi.
+        </p>
+      ) : null}
+    </FormField>
+  );
+}
+
 /* ------------------------------------------------------------ new user */
 
 interface NewUserDialogProps {
@@ -156,6 +215,7 @@ const emptyNewUser: NewUserFormValues = {
   email: '',
   password: '',
   roleIds: [],
+  companyId: null,
 };
 
 export function NewUserDialog({
@@ -235,6 +295,17 @@ export function NewUserDialog({
         </FormField>
         <Controller
           control={control}
+          name="companyId"
+          render={({ field }) => (
+            <CompanyScopeField
+              id="new-user-company"
+              value={field.value}
+              onChange={field.onChange}
+            />
+          )}
+        />
+        <Controller
+          control={control}
           name="roleIds"
           render={({ field }) => (
             <FormField
@@ -280,8 +351,14 @@ export function EditUserDialog({
 }: EditUserDialogProps) {
   const toForm = (u: StaffUser | null): UserFormValues =>
     u
-      ? { firstName: u.firstName, lastName: u.lastName, email: u.email, status: u.status }
-      : { firstName: '', lastName: '', email: '', status: 'ACTIVE' };
+      ? {
+          firstName: u.firstName,
+          lastName: u.lastName,
+          email: u.email,
+          status: u.status,
+          companyId: u.companyId ?? null,
+        }
+      : { firstName: '', lastName: '', email: '', status: 'ACTIVE', companyId: null };
   const {
     register,
     control,
@@ -329,6 +406,18 @@ export function EditUserDialog({
             {...register('email')}
           />
         </FormField>
+        <Controller
+          control={control}
+          name="companyId"
+          render={({ field }) => (
+            <CompanyScopeField
+              id="edit-user-company"
+              value={field.value}
+              onChange={field.onChange}
+              disabled={isSelf}
+            />
+          )}
+        />
         <Controller
           control={control}
           name="status"

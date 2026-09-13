@@ -2,6 +2,7 @@ import type { Job } from 'bullmq';
 import type { PinoLogger } from 'nestjs-pino';
 import type { PrismaService } from '@/infrastructure/prisma/prisma.service';
 import type { StorageService } from '@/infrastructure/storage/storage.service';
+import { createWriter, formatIstanbul } from '@/modules/signatures/pdf-builder';
 
 export interface GenerateEmployeeReportJobData {
   tenantId: string;
@@ -22,10 +23,8 @@ export interface GenerateEmployeeReportDeps {
 }
 
 /**
- * Example background job: builds a report for one employee and stores it in MinIO.
- *
- * The heavy lifting (PDF rendering, templates) is intentionally left as a TODO -
- * this demonstrates the queue -> processor -> storage wiring with tenant scoping.
+ * Builds a concise, non-clinical employee summary as a downloadable PDF.
+ * Detailed clinical reports remain under the physician approval workflow.
  */
 export async function handleGenerateEmployeeReport(
   job: Job<GenerateEmployeeReportJobData>,
@@ -36,7 +35,24 @@ export async function handleGenerateEmployeeReport(
   // Tenant scoping is explicit even inside background jobs.
   const employee = await deps.prisma.employee.findFirst({
     where: { id: employeeId, tenantId, deletedAt: null },
-    select: { id: true, firstName: true, lastName: true, companyId: true },
+    select: {
+      id: true,
+      firstName: true,
+      lastName: true,
+      registrationNumber: true,
+      jobTitle: true,
+      department: true,
+      hireDate: true,
+      status: true,
+      company: { select: { name: true } },
+      occupation: { select: { name: true } },
+      examinations: {
+        where: { deletedAt: null },
+        orderBy: { performedAt: 'desc' },
+        take: 5,
+        select: { type: true, status: true, performedAt: true, nextExaminationDue: true },
+      },
+    },
   });
   if (!employee) {
     deps.logger.warn(
@@ -48,20 +64,47 @@ export async function handleGenerateEmployeeReport(
 
   await job.updateProgress(50);
 
-  // TODO(business-logic): render a real PDF (e.g. with a template engine + headless renderer).
-  const placeholder = Buffer.from(
-    `Employee report placeholder\nEmployee: ${employee.firstName} ${employee.lastName}\nGenerated: ${new Date().toISOString()}\n`,
-    'utf8',
+  const { doc, writer } = await createWriter({
+    title: 'Çalışan Özet Raporu',
+    subject: `${employee.firstName} ${employee.lastName}`,
+    footer: `Çalışan özeti · ${employee.id}`,
+  });
+  writer.text('Çalışan Özet Raporu', { size: 16, bold: true });
+  writer.text(`Oluşturulma: ${formatIstanbul(new Date())}`, { size: 8, gapAfter: 6 });
+  writer.rule();
+  writer.keyValue('Ad Soyad', `${employee.firstName} ${employee.lastName}`);
+  writer.keyValue('Sicil No', employee.registrationNumber ?? '—');
+  writer.keyValue('Firma', employee.company?.name ?? '—');
+  writer.keyValue(
+    'Birim / görev',
+    [employee.department, employee.occupation?.name ?? employee.jobTitle]
+      .filter(Boolean)
+      .join(' · ') || '—',
   );
-  const key = `${tenantId}/reports/employees/${employeeId}/${Date.now()}.txt`;
+  writer.keyValue(
+    'İşe giriş',
+    employee.hireDate ? formatIstanbul(employee.hireDate).slice(0, 10) : '—',
+  );
+  writer.keyValue('Durum', employee.status === 'ACTIVE' ? 'Aktif' : employee.status);
+  writer.rule();
+  writer.text('Son muayeneler', { bold: true, gapAfter: 2 });
+  if (employee.examinations.length === 0) writer.text('Kayıtlı muayene bulunmuyor.');
+  for (const examination of employee.examinations) {
+    writer.keyValue(
+      examination.performedAt ? formatIstanbul(examination.performedAt) : 'Planlanmış',
+      `${examination.type} · ${examination.status}${examination.nextExaminationDue ? ` · sonraki: ${formatIstanbul(examination.nextExaminationDue).slice(0, 10)}` : ''}`,
+    );
+  }
+  const report = Buffer.from(await doc.save());
+  const key = `${tenantId}/reports/employees/${employeeId}/${Date.now()}.pdf`;
   await deps.storage.upload({
     key,
-    body: placeholder,
-    contentType: 'text/plain',
-    size: placeholder.length,
+    body: report,
+    contentType: 'application/pdf',
+    size: report.length,
   });
 
   await job.updateProgress(100);
-  deps.logger.info({ jobId: job.id, tenantId, employeeId, key }, 'Employee report generated');
+  deps.logger.info({ jobId: job.id, tenantId, employeeId }, 'Employee report generated');
   return { documentKey: key, employeeId };
 }

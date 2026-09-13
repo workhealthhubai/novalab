@@ -1,6 +1,4 @@
-import { PATHS } from '@/app/router/navigation';
-import { ModulePlaceholder } from '../module-placeholder';
-
+import { OperationPage } from '@/features/operations/operation-page';
 export function SubOsgbPage() {
-  return <ModulePlaceholder path={PATHS.subOsgb} />;
+  return <OperationPage key="sub-osgb" kind="sub-osgb" />;
 }

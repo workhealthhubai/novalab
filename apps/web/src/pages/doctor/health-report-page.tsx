@@ -131,6 +131,22 @@ export function HealthReportPage() {
         }
       />
 
+      {r.protocol?.items.some((item) => item.status === 'CANCELLED') ? (
+        <div className="rounded-md border border-warning/40 bg-warning-soft p-3 text-sm">
+          <p className="font-medium">
+            İptal edilen istemler — onay öncesi gerekçeleri kontrol edin
+          </p>
+          <ul className="list-disc pl-5">
+            {r.protocol.items
+              .filter((item) => item.status === 'CANCELLED')
+              .map((item) => (
+                <li key={item.id}>
+                  {item.type}: {item.note || 'Gerekçe girilmemiş'}
+                </li>
+              ))}
+          </ul>
+        </div>
+      ) : null}
       {r.blockers.length > 0 && !approved ? (
         <div
           className="rounded-md border border-warning/40 bg-warning-soft px-3 py-2.5 text-sm"
@@ -157,7 +173,7 @@ export function HealthReportPage() {
           error={update.error}
           onSave={(values) =>
             update.mutate(
-              { id: r.id, input: toInput(values) },
+              { id: r.id, input: { ...toInput(values), version: r.version } },
               { onSuccess: () => toast.success('Rapor kaydedildi') },
             )
           }
@@ -256,7 +272,11 @@ export function HealthReportPage() {
                 {r.tests.map((t) => (
                   <li key={`${t.module}-${t.id}`} className="flex flex-wrap items-start gap-2 py-2">
                     <Link
-                      to={TEST_MODULE_PATHS[t.module]?.(t.id) ?? '#'}
+                      to={
+                        t.module === 'lab' && r.protocolId
+                          ? `${PATHS.labResults}?protocolId=${encodeURIComponent(r.protocolId)}&recordId=${encodeURIComponent(t.id)}`
+                          : (TEST_MODULE_PATHS[t.module]?.(t.id) ?? '#')
+                      }
                       className="min-w-28 font-medium text-primary hover:underline"
                     >
                       {t.title}

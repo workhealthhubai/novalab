@@ -1,3 +1,6 @@
+import { WorkItemsPage } from '@/pages/work-items-page';
+import { DocumentTrackingPage } from '@/pages/document-tracking-page';
+import { ForgotPasswordPage, ResetPasswordPage } from '@/pages/password-recovery-pages';
 import { Navigate, type RouteObject } from 'react-router';
 import { AppLayout } from '@/layouts/app-layout';
 import { AuthLayout } from '@/layouts/auth-layout';
@@ -54,12 +57,19 @@ import { TestsPage } from '@/pages/settings/tests-page';
 import { PATHS } from './navigation';
 import { PermissionGate } from './permission-gate';
 
-/** Every planned URL exists from Phase 1 on; detail routes render the module placeholder. */
+/** Permission-gated application routes. */
 export const routes: RouteObject[] = [
+  {
+    element: <AuthLayout allowAuthenticated />,
+    children: [{ path: '/reset-password', element: <ResetPasswordPage /> }],
+  },
   { path: '/', element: <Navigate to={PATHS.dashboard} replace /> },
   {
     element: <AuthLayout />,
-    children: [{ path: PATHS.login, element: <LoginPage /> }],
+    children: [
+      { path: PATHS.login, element: <LoginPage /> },
+      { path: '/forgot-password', element: <ForgotPasswordPage /> },
+    ],
   },
   {
     element: <AppLayout />,
@@ -68,6 +78,8 @@ export const routes: RouteObject[] = [
         element: <PermissionGate />,
         children: [
           { path: PATHS.dashboard, element: <DashboardPage /> },
+          { path: PATHS.workItems, element: <WorkItemsPage /> },
+          { path: PATHS.documentTracking, element: <DocumentTrackingPage /> },
           { path: PATHS.patients, element: <PatientsPage /> },
           { path: PATHS.patientNew, element: <PatientFormPage /> },
           { path: PATHS.patientDetail, element: <PatientDetailPage /> },

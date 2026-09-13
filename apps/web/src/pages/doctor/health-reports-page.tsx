@@ -40,7 +40,13 @@ import { usePermissions } from '@/hooks/use-permissions';
 import { PendingProtocolRows, WorkStatusChips } from '@/features/protocols/pending-rows';
 import { usePendingProtocols, type WorkStatus } from '@/features/protocols/use-protocols';
 
-const STATUSES: ExaminationStatus[] = ['IN_PROGRESS', 'COMPLETED', 'APPROVED'];
+const STATUSES: ExaminationStatus[] = [
+  'SCHEDULED',
+  'IN_PROGRESS',
+  'COMPLETED',
+  'APPROVED',
+  'CANCELLED',
+];
 const DECISIONS: FitnessDecision[] = ['PENDING', 'FIT', 'FIT_WITH_RESTRICTIONS', 'UNFIT'];
 
 export function HealthReportsPage() {
@@ -49,17 +55,37 @@ export function HealthReportsPage() {
   const patientId = searchParams.get('patientId');
   const { can } = usePermissions();
   const { openForProtocol: openReport } = useHealthReportMutations();
+  const [company, setCompany] = useState('');
+  const [physician, setPhysician] = useState('');
+  const companyTerm = useDebouncedValue(company.trim(), 350);
+  const physicianTerm = useDebouncedValue(physician.trim(), 350);
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState<ExaminationStatus | null>(null);
   const [decision, setDecision] = useState<FitnessDecision | null>(null);
   const [range, setRange] = useState<DateRangeValue>({ from: '', to: '' });
   const [page, setPage] = useState(1);
   const [work, setWork] = useState<WorkStatus>('ALL');
-  const pending = usePendingProtocols('HEALTH_REPORT', work, can(PERMISSIONS.EXAMINATIONS_CREATE));
+  const filtering = Boolean(
+    search.trim() ||
+    company.trim() ||
+    physician.trim() ||
+    status ||
+    decision ||
+    range.from ||
+    range.to ||
+    patientId,
+  );
+  const pending = usePendingProtocols(
+    'HEALTH_REPORT',
+    work,
+    can(PERMISSIONS.EXAMINATIONS_CREATE) && !filtering,
+  );
   const debouncedSearch = useDebouncedValue(search.trim(), 350);
   const reports = useHealthReports({
     page,
     pageSize: 20,
+    companySearch: companyTerm || undefined,
+    physicianSearch: physicianTerm || undefined,
     ...(patientId ? { employeeId: patientId } : {}),
     ...(debouncedSearch ? { search: debouncedSearch } : {}),
     ...(status ? { status } : {}),
@@ -110,6 +136,49 @@ export function HealthReportsPage() {
               className="w-full sm:ml-auto sm:w-72"
             />
           </div>
+          <div className="grid gap-2 sm:grid-cols-3">
+            <Input
+              aria-label="Firma filtresi"
+              placeholder="Firma adında ara"
+              maxLength={150}
+              value={company}
+              onChange={(e) => {
+                setCompany(e.target.value);
+                setPage(1);
+                setWork('ALL');
+              }}
+            />
+            <Input
+              aria-label="Hekim filtresi"
+              placeholder="Hekim adı veya soyadı"
+              maxLength={150}
+              value={physician}
+              onChange={(e) => {
+                setPhysician(e.target.value);
+                setPage(1);
+                setWork('ALL');
+              }}
+            />
+            <AppButton
+              variant="secondary"
+              onClick={() => {
+                setCompany('');
+                setPhysician('');
+                setSearch('');
+                setStatus(null);
+                setDecision(null);
+                setRange({ from: '', to: '' });
+                setPage(1);
+                setWork('ALL');
+              }}
+            >
+              Filtreleri temizle
+            </AppButton>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Tarih filtresi muayene tarihini, yoksa kayıt tarihini kullanır. Filtre uygulandığında
+            yalnızca oluşturulmuş raporlar listelenir.
+          </p>
           <div
             role="group"
             aria-label="Durum ve karar filtresi"
@@ -208,7 +277,7 @@ export function HealthReportsPage() {
                       </AppButton>
                     )}
                   />
-                  {work !== 'PENDING' &&
+                  {(work !== 'PENDING' || filtering) &&
                     reports.data.items.map((r) => (
                       <TableRow
                         key={r.id}
@@ -278,7 +347,7 @@ export function HealthReportsPage() {
                     ))}
                 </TableBody>
               </Table>
-              {work !== 'PENDING' ? (
+              {work !== 'PENDING' || filtering ? (
                 <Pagination meta={reports.data.meta} onPageChange={setPage} />
               ) : null}
             </>

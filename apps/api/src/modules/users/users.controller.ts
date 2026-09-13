@@ -1,7 +1,9 @@
+import { PasswordRecoveryService } from '@/modules/users/password-recovery.service';
 import {
   Body,
   Controller,
   Get,
+  Header,
   HttpCode,
   HttpStatus,
   Param,
@@ -31,7 +33,22 @@ import { UsersService } from './users.service';
 @ApiBearerAuth()
 @Controller('users')
 export class UsersController {
-  constructor(private readonly users: UsersService) {}
+  constructor(
+    private readonly users: UsersService,
+    private readonly recovery: PasswordRecoveryService,
+  ) {}
+
+  @Post(':id/password-link')
+  @RequirePermissions(PERMISSIONS.USERS_UPDATE)
+  @SkipAudit()
+  @Header('Cache-Control', 'no-store')
+  recoveryLink(
+    @CurrentUser() actor: AuthenticatedUser,
+    @Param() { id }: IdParamDto,
+    @Req() req: RequestWithUser,
+  ) {
+    return this.recovery.issue(actor, id, extractRequestContext(req));
+  }
 
   @Get()
   @RequirePermissions(PERMISSIONS.USERS_READ)

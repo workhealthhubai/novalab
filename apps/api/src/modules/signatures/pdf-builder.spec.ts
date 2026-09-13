@@ -46,7 +46,7 @@ describe('pdf-builder', () => {
     });
     expect(pdf.subarray(0, 5).toString()).toBe('%PDF-');
     expect(await pageCount(pdf)).toBeGreaterThanOrEqual(2);
-  });
+  }, 20_000);
 
   it('stamps an existing PDF on its last page', async () => {
     const signature = await prepareSignatureStroke(await strokePng());

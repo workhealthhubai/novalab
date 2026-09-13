@@ -1,7 +1,6 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Controller, useForm } from 'react-hook-form';
 import { Link } from 'react-router';
-import { PATHS } from '@/app/router/navigation';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -134,7 +133,7 @@ export function LoginForm({ onSuccess }: LoginFormProps) {
           </Label>
         </div>
         <Link
-          to={PATHS.login}
+          to="/forgot-password"
           className="rounded-xs text-sm font-medium text-primary hover:text-primary-dark"
         >
           Şifremi Unuttum

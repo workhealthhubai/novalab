@@ -387,13 +387,13 @@ export function PatientForm({
           ) : null}
           <FormField
             id="patient-notes"
-            label="Uyarı / Açıklama"
+            label="İdari not"
             error={errors.notes?.message}
             className="sm:col-span-2 lg:col-span-3"
           >
             <Textarea
               id="patient-notes"
-              placeholder="Alerji, engel durumu, özel not…"
+              placeholder="Klinik/sağlık bilgisi yazmayın…"
               {...register('notes')}
             />
           </FormField>

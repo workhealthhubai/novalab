@@ -3,6 +3,19 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { LoggerModule as PinoLoggerModule } from 'nestjs-pino';
 import type { IncomingMessage } from 'node:http';
 import type { AppConfig } from '@/config/configuration';
+import { safeRequestPath } from '@/common/utils/safe-request-path';
+
+function safeError(error: unknown): Record<string, unknown> {
+  if (!(error instanceof Error)) return { name: 'Error' };
+  const candidate = error as Error & { code?: unknown; status?: unknown; statusCode?: unknown };
+  return {
+    name: error.name,
+    message: error.message.slice(0, 500),
+    ...(typeof candidate.code === 'string' ? { code: candidate.code } : {}),
+    ...(typeof candidate.status === 'number' ? { status: candidate.status } : {}),
+    ...(typeof candidate.statusCode === 'number' ? { statusCode: candidate.statusCode } : {}),
+  };
+}
 
 /** pino-pretty is a dev dependency; fall back to JSON logs when it is not installed. */
 function isPinoPrettyAvailable(): boolean {
@@ -54,9 +67,9 @@ function isPinoPrettyAvailable(): boolean {
               return 'info';
             },
             customSuccessMessage: (req: IncomingMessage, res: { statusCode: number }) =>
-              `${req.method ?? ''} ${req.url ?? ''} -> ${res.statusCode}`,
+              `${req.method ?? ''} ${safeRequestPath(req.url)} -> ${res.statusCode}`,
             customErrorMessage: (req: IncomingMessage, res: { statusCode: number }) =>
-              `${req.method ?? ''} ${req.url ?? ''} -> ${res.statusCode}`,
+              `${req.method ?? ''} ${safeRequestPath(req.url)} -> ${res.statusCode}`,
             redact: {
               paths: [
                 'req.headers.authorization',
@@ -77,9 +90,10 @@ function isPinoPrettyAvailable(): boolean {
               req: (req: { id: string; method: string; url: string; remoteAddress?: string }) => ({
                 id: req.id,
                 method: req.method,
-                url: req.url,
+                path: safeRequestPath(req.url),
                 remoteAddress: req.remoteAddress,
               }),
+              err: safeError,
             },
             ...(app.logPretty && isPinoPrettyAvailable()
               ? {

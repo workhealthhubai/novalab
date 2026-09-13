@@ -17,6 +17,8 @@ import {
 const emptyToNull = ({ value }: { value: unknown }) =>
   typeof value === 'string' && value.trim() === '' ? null : value;
 const nullable = (_: unknown, value: unknown) => value !== null && value !== undefined;
+const emptyToUppercaseNull = ({ value }: { value: unknown }) =>
+  typeof value === 'string' ? value.trim().toUpperCase() || null : value;
 
 export class UpdateOrganizationDto {
   @ApiPropertyOptional({ description: 'Short display name (Tenant.name)' })
@@ -139,4 +141,16 @@ export class UpdateOrganizationDto {
   @IsString()
   @MaxLength(1000)
   reportFooter?: string | null;
+
+  @ApiPropertyOptional({
+    nullable: true,
+    description: 'DICOM AE Title of the radiology device that queries this tenant worklist',
+  })
+  @Transform(emptyToUppercaseNull)
+  @IsOptional()
+  @ValidateIf(nullable)
+  @Matches(/^[A-Z0-9_.-]{1,16}$/, {
+    message: 'radiologyStationAet must be 1-16 uppercase DICOM AE characters',
+  })
+  radiologyStationAet?: string | null;
 }

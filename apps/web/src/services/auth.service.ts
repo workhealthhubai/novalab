@@ -6,6 +6,16 @@ export interface LoginPayload extends LoginRequest {
 }
 
 export const authService = {
+  async passwordHelp(email: string, tenantSlug: string): Promise<{ message: string }> {
+    return unwrap(
+      await apiClient.post('/auth/password-help', { email, tenantSlug }, { skipAuth: true }),
+    );
+  },
+  async resetPassword(token: string, password: string): Promise<{ message: string }> {
+    return unwrap(
+      await apiClient.post('/auth/reset-password', { token, password }, { skipAuth: true }),
+    );
+  },
   async login(payload: LoginPayload): Promise<LoginResponse> {
     return unwrap(await apiClient.post('/auth/login', payload, { skipAuth: true }));
   },

@@ -18,6 +18,7 @@ export interface OrganizationProfile {
   addressDistrictId: number | null;
   addressLine: string | null;
   reportFooter: string | null;
+  radiologyStationAet: string | null;
   logoUpdatedAt: string | null;
   addressProvince: LocationRef | null;
   addressDistrict: LocationRef | null;
@@ -49,4 +50,5 @@ export type OrganizationInput = Partial<{
   addressDistrictId: number | null;
   addressLine: string;
   reportFooter: string;
+  radiologyStationAet: string;
 }>;

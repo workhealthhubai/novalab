@@ -6,6 +6,7 @@ import {
   HttpCode,
   HttpStatus,
   Param,
+  Patch,
   Post,
   Query,
   Req,
@@ -24,6 +25,7 @@ import {
 } from '@/common/interfaces';
 import { DocumentsService, MAX_UPLOAD_BYTES, type UploadedFileLike } from './documents.service';
 import { DocumentQueryDto } from './dto/document-query.dto';
+import { UpdateDocumentExpiryDto } from './dto/update-document-expiry.dto';
 import { UploadDocumentDto } from './dto/upload-document.dto';
 
 @ApiTags('documents')
@@ -40,6 +42,24 @@ export class DocumentsController {
     @Query() query: DocumentQueryDto,
   ) {
     return this.documents.list(tenantId, actor, query);
+  }
+
+  @Patch(':id/expiry')
+  @RequirePermissions(PERMISSIONS.DOCUMENTS_UPLOAD)
+  updateExpiry(
+    @CurrentTenant() tenantId: string,
+    @CurrentUser() actor: AuthenticatedUser,
+    @Param() { id }: IdParamDto,
+    @Body() dto: UpdateDocumentExpiryDto,
+    @Req() req: RequestWithUser,
+  ) {
+    return this.documents.updateExpiry(
+      tenantId,
+      actor,
+      id,
+      dto.expiresAt,
+      extractRequestContext(req),
+    );
   }
 
   @Get(':id')

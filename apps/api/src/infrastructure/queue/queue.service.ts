@@ -40,6 +40,11 @@ export class QueueService implements OnModuleInit {
         { pattern: '0 6 * * *' },
         { name: JOBS.EXAMINATION_DUE_REMINDERS, data: {}, opts: DEFAULT_JOB_OPTIONS },
       );
+      await this.scheduledJobsQueue.upsertJobScheduler(
+        JOBS.PACS_RECONCILIATION,
+        { every: 2 * 60_000 },
+        { name: JOBS.PACS_RECONCILIATION, data: {}, opts: DEFAULT_JOB_OPTIONS },
+      );
     } catch (error) {
       this.logger.warn({ err: error }, 'Could not register job schedulers (is Redis up?)');
     }

@@ -52,11 +52,31 @@ export class RadiologyController {
     return this.radiology.pacsStatus();
   }
 
+  @Get('pacs/operations')
+  @RequirePermissions(PERMISSIONS.RADIOLOGY_READ)
+  @ApiOperation({ summary: 'Tenant-scoped PACS connection and worklist operation status' })
+  pacsOperations(@CurrentTenant() tenantId: string) {
+    return this.radiology.pacsOperationsStatus(tenantId);
+  }
+
   @Get('pacs/unlinked')
   @RequirePermissions(PERMISSIONS.RADIOLOGY_READ)
-  @ApiOperation({ summary: 'Newest PACS studies not attached to any request' })
+  @ApiOperation({ summary: "Incoming PACS studies for this tenant's unlinked patient requests" })
   unlinked(@CurrentTenant() tenantId: string, @Query() query: PacsListQueryDto) {
     return this.radiology.unlinkedStudies(tenantId, query.limit);
+  }
+
+  @Post('pacs/reconcile')
+  @HttpCode(HttpStatus.OK)
+  @RequirePermissions(PERMISSIONS.RADIOLOGY_CREATE)
+  @ApiOperation({ summary: 'Auto-link stable PACS studies by AccessionNumber and PatientID' })
+  reconcile(
+    @CurrentTenant() tenantId: string,
+    @CurrentUser() actor: AuthenticatedUser,
+    @Query() query: PacsListQueryDto,
+    @Req() req: RequestWithUser,
+  ) {
+    return this.radiology.reconcilePacs(tenantId, actor, query.limit, extractRequestContext(req));
   }
 
   @Get()
@@ -80,7 +100,7 @@ export class RadiologyController {
 
   @Get(':id/pacs-candidates')
   @RequirePermissions(PERMISSIONS.RADIOLOGY_CREATE)
-  @ApiOperation({ summary: "PACS studies matching the request's patient (id, TC or name)" })
+  @ApiOperation({ summary: "PACS studies whose PatientID matches the request's employee UUID" })
   candidates(@CurrentTenant() tenantId: string, @Param() { id }: IdParamDto) {
     return this.radiology.pacsCandidates(tenantId, id);
   }
@@ -95,6 +115,19 @@ export class RadiologyController {
     @Req() req: RequestWithUser,
   ) {
     return this.radiology.cancel(tenantId, actor, id, extractRequestContext(req));
+  }
+
+  @Post(':id/worklist')
+  @HttpCode(HttpStatus.OK)
+  @RequirePermissions(PERMISSIONS.RADIOLOGY_CREATE)
+  @ApiOperation({ summary: 'Publish or retry this order in the DICOM modality worklist' })
+  retryWorklist(
+    @CurrentTenant() tenantId: string,
+    @CurrentUser() actor: AuthenticatedUser,
+    @Param() { id }: IdParamDto,
+    @Req() req: RequestWithUser,
+  ) {
+    return this.radiology.retryWorklist(tenantId, actor, id, extractRequestContext(req));
   }
 
   @Post()
@@ -140,9 +173,15 @@ export class RadiologyController {
     @CurrentTenant() tenantId: string,
     @CurrentUser() actor: AuthenticatedUser,
     @Param() { id }: IdParamDto,
+    @Req() req: RequestWithUser,
     @Res({ passthrough: true }) res: Response,
   ) {
-    const session = await this.radiology.createViewerSession(tenantId, actor, id);
+    const session = await this.radiology.createViewerSession(
+      tenantId,
+      actor,
+      id,
+      extractRequestContext(req),
+    );
     res.cookie(session.cookie.name, session.cookie.value, {
       httpOnly: true,
       secure: this.secureCookies,

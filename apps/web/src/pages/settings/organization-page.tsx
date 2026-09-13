@@ -164,6 +164,20 @@ function OrganizationForm({ organization }: { organization: Organization }) {
             >
               <Input id="org-authNo" {...register('authorizationNumber')} />
             </FormField>
+            <FormField
+              id="org-radiology-aet"
+              label="Radyoloji cihazı AE Title"
+              error={errors.radiologyStationAet?.message}
+              hint="Cihazın PACS/MWL ayarındaki Calling AE Title; ör. XRAY01"
+            >
+              <Input
+                id="org-radiology-aet"
+                maxLength={16}
+                autoCapitalize="characters"
+                placeholder="XRAY01"
+                {...register('radiologyStationAet')}
+              />
+            </FormField>
             <Controller
               control={control}
               name="authorizationDate"

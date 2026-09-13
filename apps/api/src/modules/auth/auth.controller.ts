@@ -1,3 +1,5 @@
+import { PasswordHelpDto, ResetPasswordDto } from '@/modules/users/dto/password-recovery.dto';
+import { PasswordRecoveryService } from '@/modules/users/password-recovery.service';
 import {
   Body,
   Controller,
@@ -18,6 +20,7 @@ import {
   extractRequestContext,
   type RequestWithUser,
 } from '@/common/interfaces';
+import { CompanySelfAccess } from '@/common/decorators/company-scoped.decorator';
 import { parseCookies } from '@/common/utils/cookies';
 import { AuthService, DICOMWEB_COOKIE } from './auth.service';
 import { LoginDto } from './dto/login.dto';
@@ -27,7 +30,26 @@ import { RefreshTokenDto } from './dto/refresh-token.dto';
 @SkipAudit() // login/refresh/logout are audited explicitly by AuthService (LOGIN, LOGIN_FAILED, LOGOUT, TOKEN_REUSE_DETECTED)
 @Controller('auth')
 export class AuthController {
-  constructor(private readonly auth: AuthService) {}
+  constructor(
+    private readonly auth: AuthService,
+    private readonly recovery: PasswordRecoveryService,
+  ) {}
+
+  @Post('password-help')
+  @Public()
+  @HttpCode(HttpStatus.ACCEPTED)
+  @Throttle({ default: { limit: 3, ttl: 60 * 60_000 } })
+  passwordHelp(@Body() dto: PasswordHelpDto) {
+    return this.recovery.requestHelp(dto);
+  }
+
+  @Post('reset-password')
+  @Public()
+  @HttpCode(HttpStatus.OK)
+  @Throttle({ default: { limit: 10, ttl: 60 * 60_000 } })
+  resetPassword(@Body() dto: ResetPasswordDto, @Req() req: RequestWithUser) {
+    return this.recovery.reset(dto, extractRequestContext(req));
+  }
 
   @Post('login')
   @Public()
@@ -58,6 +80,7 @@ export class AuthController {
   }
 
   @Get('me')
+  @CompanySelfAccess()
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Current principal with roles and permissions' })
   me(@CurrentUser() user: AuthenticatedUser): AuthenticatedUser {
@@ -72,14 +95,20 @@ export class AuthController {
   @Public()
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: 'Nginx auth_request endpoint for DICOMweb access (internal)' })
-  verifyDicomWeb(@Req() req: Request, @Res() res: Response): void {
+  async verifyDicomWeb(@Req() req: Request, @Res() res: Response): Promise<void> {
     const cookies = parseCookies(req.headers.cookie);
     const token = cookies[DICOMWEB_COOKIE];
     if (!token) throw new UnauthorizedException('Missing viewer session');
     try {
-      const payload = this.auth.verifyDicomWebToken(token);
+      const originalUri = req.headers['x-original-uri'];
+      const originalMethod = req.headers['x-original-method'];
+      if (typeof originalUri !== 'string' || typeof originalMethod !== 'string') {
+        throw new Error('Missing original DICOMweb request metadata');
+      }
+      const payload = await this.auth.verifyDicomWebAccess(token, originalUri, originalMethod);
       res.setHeader('x-osgb-user-id', payload.sub);
       res.setHeader('x-osgb-tenant-id', payload.tid);
+      res.setHeader('x-osgb-study-uid', payload.suid);
       res.status(HttpStatus.NO_CONTENT).send();
     } catch {
       throw new UnauthorizedException('Invalid viewer session');

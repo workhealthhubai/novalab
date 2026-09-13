@@ -34,6 +34,14 @@ export const organizationSchema = z.object({
   addressDistrictId: z.number().nullable(),
   addressLine: text(500),
   reportFooter: text(1000),
+  radiologyStationAet: z
+    .string()
+    .trim()
+    .toUpperCase()
+    .refine(
+      (value) => value === '' || /^[A-Z0-9_.-]{1,16}$/.test(value),
+      'AE Title 1-16 karakter olmalı',
+    ),
 });
 export type OrganizationFormValues = z.infer<typeof organizationSchema>;
 
@@ -56,6 +64,7 @@ export function toFormValues(org: Organization): OrganizationFormValues {
     addressDistrictId: p.addressDistrictId,
     addressLine: p.addressLine ?? '',
     reportFooter: p.reportFooter ?? '',
+    radiologyStationAet: p.radiologyStationAet ?? '',
   };
 }
 

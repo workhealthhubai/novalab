@@ -1,6 +1,12 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import * as argon2 from 'argon2';
-import { AuditAction, type Permission, type PaginatedResult } from '@osgb/shared-types';
+import {
+  AuditAction,
+  PERMISSIONS,
+  SYSTEM_ROLES,
+  type Permission,
+  type PaginatedResult,
+} from '@osgb/shared-types';
 import type { AuthenticatedUser, RequestContext } from '@/common/interfaces';
 import { paginate, toSkipTake } from '@/common/utils/pagination';
 import type { User } from '@/generated/prisma/client';
@@ -36,6 +42,16 @@ export function toAuthenticatedUser(user: UserWithAccess): AuthenticatedUser {
   for (const ur of user.userRoles) {
     for (const rp of ur.role.rolePermissions) permissions.add(rp.permission.key);
   }
+  if (user.companyId || roles.includes(SYSTEM_ROLES.COMPANY_REPRESENTATIVE)) {
+    const allowed = new Set<string>([
+      PERMISSIONS.COMPANIES_READ,
+      PERMISSIONS.EMPLOYEES_READ,
+      PERMISSIONS.WORKPLACES_READ,
+      PERMISSIONS.APPOINTMENTS_READ,
+    ]);
+    for (const permission of permissions)
+      if (!allowed.has(permission)) permissions.delete(permission);
+  }
   return {
     id: user.id,
     tenantId: user.tenantId,
@@ -43,6 +59,8 @@ export function toAuthenticatedUser(user: UserWithAccess): AuthenticatedUser {
     firstName: user.firstName,
     lastName: user.lastName,
     status: user.status,
+    companyId: user.companyId ?? null,
+    companyAccessActive: Boolean(user.company && !user.company.deletedAt),
     roles,
     permissions: [...permissions].sort() as Permission[],
   };
@@ -81,12 +99,19 @@ export class UsersService {
     dto: CreateUserDto,
     ctx: RequestContext,
   ): Promise<User> {
+    await this.assertCompany(tenantId, dto.companyId);
     const roleIds = dto.roleIds ?? [];
     await this.assertRolesBelongToTenant(tenantId, roleIds);
     const passwordHash = await hashPassword(dto.password);
     const user = await this.users.create(
       tenantId,
-      { email: dto.email, passwordHash, firstName: dto.firstName, lastName: dto.lastName },
+      {
+        email: dto.email,
+        passwordHash,
+        firstName: dto.firstName,
+        lastName: dto.lastName,
+        companyId: dto.companyId,
+      },
       roleIds,
     );
     await this.audit.log({
@@ -95,7 +120,13 @@ export class UsersService {
       action: AuditAction.CREATE,
       entityType: 'User',
       entityId: user.id,
-      newValue: { email: user.email, firstName: user.firstName, lastName: user.lastName, roleIds },
+      newValue: {
+        email: user.email,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        roleIds,
+        companyId: user.companyId,
+      },
       ...ctx,
     });
     return user;
@@ -109,6 +140,10 @@ export class UsersService {
     ctx: RequestContext,
   ) {
     const before = await this.get(tenantId, id);
+    await this.assertCompany(tenantId, dto.companyId);
+    if (id === actor.id && dto.companyId !== undefined && dto.companyId !== before.companyId) {
+      throw new BadRequestException('Kendi firma erişim kapsamınızı değiştiremezsiniz.');
+    }
     if (id === actor.id && dto.status !== undefined && dto.status !== 'ACTIVE') {
       throw new BadRequestException({
         message: 'You cannot deactivate your own account',
@@ -116,6 +151,7 @@ export class UsersService {
       });
     }
     const updated = await this.users.update(tenantId, id, {
+      ...(dto.companyId !== undefined ? { companyId: dto.companyId } : {}),
       ...(dto.email !== undefined ? { email: dto.email.toLowerCase() } : {}),
       ...(dto.firstName !== undefined ? { firstName: dto.firstName } : {}),
       ...(dto.lastName !== undefined ? { lastName: dto.lastName } : {}),
@@ -188,6 +224,15 @@ export class UsersService {
 
   touchLastLogin(id: string): Promise<void> {
     return this.users.touchLastLogin(id);
+  }
+
+  private async assertCompany(tenantId: string, companyId: string | null | undefined) {
+    if (companyId && !(await this.users.companyExists(tenantId, companyId))) {
+      throw new BadRequestException({
+        message: 'Seçilen firma bu kurumda bulunamadı.',
+        errorCode: 'INVALID_COMPANY',
+      });
+    }
   }
 
   private async assertRolesBelongToTenant(tenantId: string, roleIds: string[]): Promise<void> {

@@ -49,16 +49,44 @@ export interface AuditQuery {
 /** Fields that must never be persisted in audit payloads. */
 const SENSITIVE_KEYS = new Set([
   'password',
-  'passwordHash',
-  'accessToken',
-  'refreshToken',
-  'tokenHash',
+  'passwordhash',
+  'accesstoken',
+  'refreshtoken',
+  'tokenhash',
+  'authorization',
+  'nationalid',
+  'passportnumber',
+  'firstname',
+  'lastname',
+  'birthdate',
+  'anamnesis',
+  'systemsexam',
+  'findings',
+  'conclusion',
+  'reporttext',
+  'signature',
+  'signaturekey',
+  'clinicalinfo',
+  'notes',
+  'email',
+  'phone',
+  'address',
+  'addressline',
+  'objectkey',
+  'filename',
+  'search',
+  'query',
 ]);
 
-function toJson(value: unknown): Prisma.InputJsonValue | undefined {
+export function toAuditJson(value: unknown): Prisma.InputJsonValue | undefined {
   if (value === undefined || value === null) return undefined;
   const sanitized = JSON.parse(
-    JSON.stringify(value, (key, val: unknown) => (SENSITIVE_KEYS.has(key) ? '[REDACTED]' : val)),
+    JSON.stringify(value, (key, val: unknown) => {
+      const normalizedKey = key.toLowerCase();
+      if (SENSITIVE_KEYS.has(normalizedKey)) return '[REDACTED]';
+      if (normalizedKey === 'path' && typeof val === 'string') return val.split(/[?#]/, 1)[0];
+      return val;
+    }),
   ) as Prisma.InputJsonValue;
   return sanitized;
 }
@@ -121,12 +149,12 @@ export class AuditService {
           action: entry.action,
           entityType: entry.entityType,
           entityId: entry.entityId ?? null,
-          oldValue: toJson(entry.oldValue),
-          newValue: toJson(entry.newValue),
+          oldValue: toAuditJson(entry.oldValue),
+          newValue: toAuditJson(entry.newValue),
           ipAddress: entry.ipAddress ?? null,
           userAgent: entry.userAgent?.slice(0, 512) ?? null,
           requestId: entry.requestId ?? null,
-          metadata: toJson(entry.metadata),
+          metadata: toAuditJson(entry.metadata),
         },
       });
     } catch (error) {

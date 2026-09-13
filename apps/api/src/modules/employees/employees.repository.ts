@@ -64,9 +64,9 @@ export class EmployeesRepository {
     ]);
   }
 
-  findById(tenantId: string, id: string): Promise<EmployeeDetail | null> {
+  findById(tenantId: string, id: string, companyId?: string): Promise<EmployeeDetail | null> {
     return this.prisma.employee.findFirst({
-      where: { id, tenantId, deletedAt: null },
+      where: { id, tenantId, deletedAt: null, ...(companyId ? { companyId } : {}) },
       include: employeeDetailInclude,
     });
   }

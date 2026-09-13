@@ -23,12 +23,19 @@ import { newEcgPath } from '@/features/ecg/ecg-labels';
 import { newEyePath } from '@/features/eye/eye-labels';
 import { reportPath } from '@/features/health-reports/report-labels';
 import { useHealthReportMutations } from '@/features/health-reports/use-health-reports';
-import { FITNESS_DECISION } from '@/features/examinations/examination-labels';
+import { EXAMINATION_STATUS } from '@/features/examinations/examination-labels';
 import { recordLinks } from '@/features/protocols/record-links';
 import { newReadingPath } from '@/features/pneumoconiosis/pneumoconiosis-labels';
 import { newSpirometryPath } from '@/features/spirometry/spirometry-labels';
 import { Can } from '@/components/can';
 import { Checkbox } from '@/components/ui/checkbox';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import {
   Table,
@@ -102,6 +109,9 @@ export function ProtocolDetailPage() {
   const { close, cancel, reopen } = useProtocolLifecycle(protocolId);
   const [confirm, setConfirm] = useState<'close' | 'closePending' | 'cancel' | null>(null);
   const [adding, setAdding] = useState<ProtocolItemType[]>([]);
+  const [itemNote, setItemNote] = useState<{ id: string; note: string; cancel: boolean } | null>(
+    null,
+  );
   const [noteDraft, setNoteDraft] = useState<string | null>(null);
 
   const breadcrumbs = [
@@ -140,8 +150,15 @@ export function ProtocolDetailPage() {
   );
   const fail = (title: string) => (error: unknown) => toast.error(title, toApiError(error).message);
 
-  const setItemStatus = (itemId: string, status: 'PENDING' | 'DONE' | 'CANCELLED') =>
-    updateItem.mutate({ itemId, status }, { onError: fail('Tetkik güncellenemedi') });
+  const setItemStatus = (itemId: string, status: 'PENDING' | 'DONE' | 'CANCELLED') => {
+    if (status === 'CANCELLED')
+      setItemNote({
+        id: itemId,
+        note: p.items.find((item) => item.id === itemId)?.note ?? '',
+        cancel: true,
+      });
+    else updateItem.mutate({ itemId, status }, { onError: fail('Tetkik güncellenemedi') });
+  };
 
   return (
     <>
@@ -155,8 +172,7 @@ export function ProtocolDetailPage() {
               <AppButton variant="ghost" asChild>
                 <Link to={reportPath(p.examinations[0].id)}>
                   <FileHeart />
-                  Rapor: {FITNESS_DECISION[p.examinations[0].fitnessDecision].label}
-                  {p.examinations[0].reportDocumentId ? ' · PDF' : ''}
+                  Rapor: {EXAMINATION_STATUS[p.examinations[0].status].label}
                 </Link>
               </AppButton>
             ) : null}
@@ -282,7 +298,26 @@ export function ProtocolDetailPage() {
                   <TableCell>{item.completedAt ? formatDateTime(item.completedAt) : '—'}</TableCell>
                   <TableCell>
                     {recordLinks(records.data, item.type).length === 0 ? (
-                      <span className="text-muted-foreground">—</span>
+                      editable &&
+                      item.status === 'PENDING' &&
+                      (item.type === 'LAB' || item.type === 'ISG_REPORT') ? (
+                        <Can
+                          permission={
+                            item.type === 'LAB'
+                              ? PERMISSIONS.EXAMINATIONS_UPDATE
+                              : PERMISSIONS.REPORTS_EXPORT
+                          }
+                        >
+                          <Link
+                            className="text-primary hover:underline"
+                            to={`${item.type === 'LAB' ? PATHS.labResults : PATHS.isgReports}?protocolId=${p.id}${p.companyId ? `&companyId=${p.companyId}` : ''}`}
+                          >
+                            {item.type === 'LAB' ? 'Sonuç gir' : 'Rapor oluştur'}
+                          </Link>
+                        </Can>
+                      ) : (
+                        <span className="text-muted-foreground">—</span>
+                      )
                     ) : (
                       <ul className="flex flex-col gap-0.5 text-xs">
                         {recordLinks(records.data, item.type).map((link) => (
@@ -304,6 +339,19 @@ export function ProtocolDetailPage() {
                   </TableCell>
                   <TableCell className="max-w-[240px] truncate text-muted-foreground">
                     {item.note ?? '—'}
+                    {editable ? (
+                      <Can permission={PERMISSIONS.PROTOCOLS_UPDATE}>
+                        <AppButton
+                          size="sm"
+                          variant="secondary"
+                          onClick={() =>
+                            setItemNote({ id: item.id, note: item.note ?? '', cancel: false })
+                          }
+                        >
+                          Not / gerekçe
+                        </AppButton>
+                      </Can>
+                    ) : null}
                   </TableCell>
                   <TableCell className="text-right">
                     {editable ? (
@@ -479,6 +527,56 @@ export function ProtocolDetailPage() {
         </SectionCard>
       </div>
 
+      <Dialog open={itemNote !== null} onOpenChange={(open) => !open && setItemNote(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>
+              {itemNote?.cancel ? 'Tetkik iptal gerekçesi' : 'Tetkik notu / gerekçesi'}
+            </DialogTitle>
+            <DialogDescription>
+              İptal gerekçesi hekim değerlendirmesinde ve rapor çıktısında gösterilir.
+            </DialogDescription>
+          </DialogHeader>
+          <Textarea
+            aria-label="Tetkik notu veya iptal gerekçesi"
+            maxLength={500}
+            value={itemNote?.note ?? ''}
+            onChange={(event) =>
+              setItemNote((current) => (current ? { ...current, note: event.target.value } : null))
+            }
+          />
+          <AppButton
+            disabled={!itemNote || (itemNote.cancel && !itemNote.note.trim())}
+            loading={updateItem.isPending || close.isPending}
+            onClick={() => {
+              if (!itemNote) return;
+              const options = {
+                onSuccess: () => {
+                  setItemNote(null);
+                  setConfirm(null);
+                },
+                onError: fail('Kaydedilemedi'),
+              };
+              if (itemNote.id === '__pending')
+                close.mutate(
+                  { cancelPending: true, cancellationReason: itemNote.note.trim() },
+                  options,
+                );
+              else
+                updateItem.mutate(
+                  {
+                    itemId: itemNote.id,
+                    note: itemNote.note.trim(),
+                    ...(itemNote.cancel ? { status: 'CANCELLED' as const } : {}),
+                  },
+                  options,
+                );
+            }}
+          >
+            Kaydet
+          </AppButton>
+        </DialogContent>
+      </Dialog>
       <ConfirmDialog
         open={confirm === 'close'}
         onOpenChange={(open) => !open && setConfirm(null)}
@@ -504,15 +602,10 @@ export function ProtocolDetailPage() {
         description={`${pending.map((item) => PROTOCOL_ITEM_LABELS[item.type]).join(', ')} henüz tamamlanmadı. Kapatırsanız bekleyenler iptal edilir.`}
         confirmLabel="Bekleyenleri iptal edip kapat"
         loading={close.isPending}
-        onConfirm={() =>
-          close.mutate(true, {
-            onSuccess: () => {
-              setConfirm(null);
-              toast.success('Protokol kapatıldı');
-            },
-            onError: fail('Kapatılamadı'),
-          })
-        }
+        onConfirm={() => {
+          setConfirm(null);
+          setItemNote({ id: '__pending', note: '', cancel: true });
+        }}
       />
       <ConfirmDialog
         open={confirm === 'cancel'}

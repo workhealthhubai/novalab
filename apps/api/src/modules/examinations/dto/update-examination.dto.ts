@@ -1,15 +1,22 @@
 import { ApiPropertyOptional, OmitType, PartialType } from '@nestjs/swagger';
-import { IsDateString, IsEnum, IsOptional, IsString, MaxLength } from 'class-validator';
-import { ExaminationStatus, FitnessDecision } from '@osgb/shared-types';
+import { IsDateString, IsEnum, IsIn, IsOptional, IsString, MaxLength } from 'class-validator';
+import { FitnessDecision } from '@osgb/shared-types';
+import {
+  MUTABLE_EXAMINATION_STATUSES,
+  type MutableExaminationStatus,
+} from '../examination-status.policy';
 import { CreateExaminationDto } from './create-examination.dto';
 
 export class UpdateExaminationDto extends PartialType(
   OmitType(CreateExaminationDto, ['employeeId'] as const),
 ) {
-  @ApiPropertyOptional({ enum: Object.values(ExaminationStatus) })
+  @ApiPropertyOptional({
+    enum: MUTABLE_EXAMINATION_STATUSES,
+    description: 'APPROVED is only available through POST /health-reports/:id/approve',
+  })
   @IsOptional()
-  @IsEnum(ExaminationStatus)
-  status?: ExaminationStatus;
+  @IsIn(MUTABLE_EXAMINATION_STATUSES)
+  status?: MutableExaminationStatus;
 
   @ApiPropertyOptional({ format: 'date-time' })
   @IsOptional()

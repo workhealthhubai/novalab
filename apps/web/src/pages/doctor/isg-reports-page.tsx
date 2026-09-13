@@ -1,6 +1,4 @@
-import { PATHS } from '@/app/router/navigation';
-import { ModulePlaceholder } from '../module-placeholder';
-
+import { OperationPage } from '@/features/operations/operation-page';
 export function IsgReportsPage() {
-  return <ModulePlaceholder path={PATHS.isgReports} />;
+  return <OperationPage key="isg" kind="isg" />;
 }

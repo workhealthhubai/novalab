@@ -49,6 +49,12 @@ export class ProtocolItemParamDto {
 }
 
 export class CloseProtocolDto {
+  @ApiPropertyOptional({ maxLength: 500 })
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  cancellationReason?: string;
+
   @ApiPropertyOptional({ description: 'Cancel still-pending items instead of refusing to close' })
   @IsOptional()
   @IsBoolean()

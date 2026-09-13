@@ -66,7 +66,7 @@ describe('AuditInterceptor', () => {
         action: 'POST /api/employees',
         entityType: 'Employees',
         entityId: 'e1',
-        newValue: { firstName: 'A', password: '[REDACTED]' },
+        newValue: { changedFields: ['firstName', 'password'] },
         requestId: 'req-1',
         metadata: expect.objectContaining({ statusCode: 201, outcome: 'SUCCESS', method: 'POST' }),
       }),
@@ -103,10 +103,10 @@ describe('AuditInterceptor', () => {
     const request = {
       method: 'PATCH',
       route: { path: '/api/employees/:id' },
-      originalUrl: '/api/employees/e1',
+      originalUrl: '/api/employees/e1?search=10000000146',
       params: { id: 'e1' },
       user,
-      body: {},
+      body: { anamnesis: 'private clinical text', nationalId: '10000000146' },
       headers: {},
     };
     const failing: CallHandler = {
@@ -119,7 +119,9 @@ describe('AuditInterceptor', () => {
     expect(audit.log).toHaveBeenCalledWith(
       expect.objectContaining({
         entityId: 'e1',
+        newValue: { changedFields: ['anamnesis', 'nationalId'] },
         metadata: expect.objectContaining({
+          path: '/api/employees/:id',
           outcome: 'FAILURE',
           statusCode: 400,
           errorCode: 'INVALID_COMPANY',
@@ -155,10 +157,14 @@ describe('AuditInterceptor', () => {
       nested: { Authorization: 'x', ok: 1 },
       long: 'a'.repeat(3000),
       file: Buffer.alloc(10),
+      anamnesis: 'private clinical text',
+      nationalId: '10000000146',
     }) as Record<string, unknown>;
     expect(result.refreshToken).toBe('[REDACTED]');
     expect((result.nested as Record<string, unknown>).Authorization).toBe('[REDACTED]');
     expect((result.long as string).endsWith('[truncated]')).toBe(true);
     expect(result.file).toBe('[buffer 10B]');
+    expect(result.anamnesis).toBe('[REDACTED]');
+    expect(result.nationalId).toBe('[REDACTED]');
   });
 });

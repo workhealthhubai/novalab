@@ -3,6 +3,7 @@ import type { Readable } from 'node:stream';
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { AuditAction, type IdentityVerificationResult } from '@osgb/shared-types';
 import type { AuthenticatedUser, RequestContext } from '@/common/interfaces';
+import { scopedCompanyFilter, companyScope } from '@/common/policies/company-scope';
 import { paginate, toSkipTake } from '@/common/utils/pagination';
 import type { Employee } from '@/generated/prisma/client';
 import { QueueService } from '@/infrastructure/queue/queue.service';
@@ -16,6 +17,7 @@ import type { CreateEmployeeDto } from './dto/create-employee.dto';
 import type { EmployeeQueryDto } from './dto/employee-query.dto';
 import type { MarkIdentityVerifiedDto } from './dto/mark-identity-verified.dto';
 import type { UpdateEmployeeDto } from './dto/update-employee.dto';
+import { assertCanWriteEmployeeNotes, employeeVisibleTo } from './employee-notes.policy';
 import { PHOTO_MIME_TYPES, preparePortrait } from './employee-photo';
 import { type EmployeeDetail, EmployeesRepository } from './employees.repository';
 
@@ -60,10 +62,18 @@ export class EmployeesService {
     private readonly occupations: OccupationsService,
   ) {}
 
-  async list(tenantId: string, query: EmployeeQueryDto) {
+  async list(tenantId: string, actor: AuthenticatedUser, query: EmployeeQueryDto) {
     const { skip, take } = toSkipTake(query.page, query.pageSize);
-    const [items, total] = await this.employees.findMany(tenantId, skip, take, query);
-    return paginate(items, query.page, query.pageSize, total);
+    const [items, total] = await this.employees.findMany(tenantId, skip, take, {
+      ...query,
+      companyId: scopedCompanyFilter(actor, query.companyId),
+    });
+    return paginate(
+      items.map((employee) => employeeVisibleTo(actor, employee)),
+      query.page,
+      query.pageSize,
+      total,
+    );
   }
 
   async get(tenantId: string, id: string): Promise<EmployeeDetail> {
@@ -72,12 +82,19 @@ export class EmployeesService {
     return employee;
   }
 
+  async getForActor(tenantId: string, actor: AuthenticatedUser, id: string) {
+    const employee = await this.employees.findById(tenantId, id, companyScope(actor));
+    if (!employee) throw new NotFoundException('Employee not found');
+    return employeeVisibleTo(actor, employee);
+  }
+
   async create(
     tenantId: string,
     actor: AuthenticatedUser,
     dto: CreateEmployeeDto,
     ctx: RequestContext,
   ): Promise<Employee> {
+    assertCanWriteEmployeeNotes(actor, dto.notes);
     await this.assertReferences(tenantId, dto);
     const employee = await this.employees.create(tenantId, {
       ...dto,
@@ -93,7 +110,7 @@ export class EmployeesService {
       newValue: auditSnapshot(employee),
       ...ctx,
     });
-    return employee;
+    return employeeVisibleTo(actor, employee);
   }
 
   async update(
@@ -103,6 +120,7 @@ export class EmployeesService {
     dto: UpdateEmployeeDto,
     ctx: RequestContext,
   ): Promise<Employee> {
+    assertCanWriteEmployeeNotes(actor, dto.notes);
     const before = await this.get(tenantId, id);
     await this.assertReferences(tenantId, dto);
 
@@ -137,7 +155,7 @@ export class EmployeesService {
       newValue: { ...auditSnapshot(employee), changedFields: Object.keys(dto) },
       ...ctx,
     });
-    return employee;
+    return employeeVisibleTo(actor, employee);
   }
 
   async remove(

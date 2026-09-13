@@ -1,4 +1,4 @@
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import {
   BadRequestException,
   ForbiddenException,
@@ -14,6 +14,7 @@ import { StorageService } from '@/infrastructure/storage/storage.service';
 import { AuditService } from '@/modules/audit/audit.service';
 import type { DocumentQueryDto } from './dto/document-query.dto';
 import type { UploadDocumentDto } from './dto/upload-document.dto';
+import { isMedicalDocument } from './document-policy';
 import { DocumentsRepository } from './documents.repository';
 
 export const MAX_UPLOAD_BYTES = 25 * 1024 * 1024;
@@ -79,6 +80,33 @@ export class DocumentsService {
     return document;
   }
 
+  async updateExpiry(
+    tenantId: string,
+    actor: AuthenticatedUser,
+    id: string,
+    expiresAt: string | null,
+    ctx: RequestContext,
+  ) {
+    const before = await this.get(tenantId, actor, id);
+    const result = await this.documents.updateExpiry(
+      tenantId,
+      id,
+      expiresAt ? new Date(expiresAt) : null,
+    );
+    if (!result.count) throw new NotFoundException('Document not found');
+    await this.audit.log({
+      tenantId,
+      userId: actor.id,
+      action: AuditAction.UPDATE,
+      entityType: 'Document',
+      entityId: id,
+      oldValue: { expiresAt: before.expiresAt },
+      newValue: { expiresAt },
+      ...ctx,
+    });
+    return this.get(tenantId, actor, id);
+  }
+
   async upload(
     tenantId: string,
     actor: AuthenticatedUser,
@@ -97,7 +125,14 @@ export class DocumentsService {
     if (file.size > MAX_UPLOAD_BYTES) {
       throw new BadRequestException({ message: 'File is too large', errorCode: 'FILE_TOO_LARGE' });
     }
-    if (dto.isMedical && !hasMedicalAccess(actor)) {
+    const category = dto.category ?? 'OTHER';
+    const relations = await this.resolveUploadRelations(tenantId, dto);
+    const isMedical = isMedicalDocument({
+      requestedMedical: dto.isMedical,
+      category,
+      examinationId: dto.examinationId,
+    });
+    if (isMedical && !hasMedicalAccess(actor)) {
       throw new ForbiddenException({
         message: 'Cannot upload medical documents',
         errorCode: 'MEDICAL_ACCESS_DENIED',
@@ -106,23 +141,26 @@ export class DocumentsService {
 
     const fileName = sanitizeFileName(file.originalname);
     const key = `${tenantId}/documents/${randomUUID()}-${fileName}`;
+    const checksum = createHash('sha256').update(file.buffer).digest('hex');
     const stored = await this.storage.upload({
       key,
       body: file.buffer,
       contentType: file.mimetype,
       size: file.size,
+      metadata: { 'x-amz-meta-sha256': checksum },
     });
 
     const document = await this.documents.create(tenantId, {
-      category: dto.category ?? 'OTHER',
+      category,
+      expiresAt: dto.expiresAt ? new Date(dto.expiresAt) : null,
       fileName,
       mimeType: file.mimetype,
       sizeBytes: file.size,
       bucket: stored.bucket,
       objectKey: stored.key,
-      checksum: stored.etag,
-      isMedical: dto.isMedical ?? false,
-      employeeId: dto.employeeId,
+      checksum,
+      isMedical,
+      employeeId: relations.employeeId,
       companyId: dto.companyId,
       examinationId: dto.examinationId,
       uploadedById: actor.id,
@@ -136,7 +174,6 @@ export class DocumentsService {
       entityType: 'Document',
       entityId: document.id,
       newValue: {
-        fileName,
         mimeType: file.mimetype,
         sizeBytes: file.size,
         category: document.category,
@@ -187,8 +224,60 @@ export class DocumentsService {
       action: AuditAction.DELETE,
       entityType: 'Document',
       entityId: id,
-      oldValue: { fileName: document.fileName, category: document.category },
+      oldValue: { category: document.category, isMedical: document.isMedical },
       ...ctx,
     });
+  }
+
+  private async resolveUploadRelations(tenantId: string, dto: UploadDocumentDto) {
+    const [employee, companyExists, examination] = await Promise.all([
+      dto.employeeId
+        ? this.documents.findEmployeeContext(tenantId, dto.employeeId)
+        : Promise.resolve(null),
+      dto.companyId ? this.documents.companyExists(tenantId, dto.companyId) : Promise.resolve(true),
+      dto.examinationId
+        ? this.documents.findExaminationContext(tenantId, dto.examinationId)
+        : Promise.resolve(null),
+    ]);
+
+    if (dto.employeeId && !employee)
+      throw new BadRequestException({
+        message: 'Employee not found in this tenant',
+        errorCode: 'INVALID_EMPLOYEE',
+      });
+    if (!companyExists)
+      throw new BadRequestException({
+        message: 'Company not found in this tenant',
+        errorCode: 'INVALID_COMPANY',
+      });
+    if (dto.examinationId && !examination)
+      throw new BadRequestException({
+        message: 'Examination not found in this tenant',
+        errorCode: 'INVALID_EXAMINATION',
+      });
+    if (
+      examination &&
+      (examination.employee.deletedAt || examination.employee.tenantId !== tenantId)
+    )
+      throw new BadRequestException({
+        message: 'Examination patient is not active in this tenant',
+        errorCode: 'INVALID_EXAMINATION_EMPLOYEE',
+      });
+
+    const employeeId = examination?.employeeId ?? employee?.id;
+    if (examination && employee && examination.employeeId !== employee.id)
+      throw new BadRequestException({
+        message: 'Document employee does not match the examination patient',
+        errorCode: 'DOCUMENT_EMPLOYEE_MISMATCH',
+      });
+
+    const employeeCompanyId = examination?.employee.companyId ?? employee?.companyId;
+    if (dto.companyId && employeeId && employeeCompanyId !== dto.companyId)
+      throw new BadRequestException({
+        message: 'Document company does not match the patient company',
+        errorCode: 'DOCUMENT_COMPANY_MISMATCH',
+      });
+
+    return { employeeId };
   }
 }

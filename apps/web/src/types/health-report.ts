@@ -29,6 +29,7 @@ export interface HealthReport {
   approvedAt: string | null;
   nextExaminationDue: string | null;
   reportDocumentId: string | null;
+  version: number;
   createdAt: string;
   updatedAt: string;
   anamnesis: Anamnesis;
@@ -51,7 +52,12 @@ export interface HealthReport {
     protocolNumber: string;
     type: ExaminationType;
     status: ProtocolStatus;
-    items: Array<{ id: string; type: ProtocolItemType; status: ProtocolItemStatus }>;
+    items: Array<{
+      id: string;
+      type: ProtocolItemType;
+      status: ProtocolItemStatus;
+      note?: string | null;
+    }>;
   } | null;
   physicianProfile: {
     id: string;
@@ -63,11 +69,17 @@ export interface HealthReport {
     signatureUpdatedAt: string | null;
   } | null;
   approvedBy: { id: string; firstName: string; lastName: string } | null;
-  reportDocument: { id: string; fileName: string; sizeBytes: number; createdAt: string } | null;
+  reportDocument: {
+    id: string;
+    fileName: string;
+    sizeBytes: number;
+    checksum: string | null;
+    createdAt: string;
+  } | null;
 }
 
 export interface TestSummary {
-  module: 'audiometry' | 'spirometry' | 'eye' | 'ecg' | 'radiology' | 'pneumoconiosis';
+  module: 'lab' | 'audiometry' | 'spirometry' | 'eye' | 'ecg' | 'radiology' | 'pneumoconiosis';
   id: string;
   performedAt: string;
   title: string;
@@ -78,6 +90,8 @@ export interface TestSummary {
 export type HealthReportDetail = HealthReport & { tests: TestSummary[] };
 
 export interface HealthReportListQuery {
+  companySearch?: string;
+  physicianSearch?: string;
   page?: number;
   pageSize?: number;
   employeeId?: string;
@@ -89,6 +103,7 @@ export interface HealthReportListQuery {
 }
 
 export interface HealthReportUpdateInput {
+  version?: number;
   performedAt?: string;
   physicianProfileId?: string | null;
   anamnesis?: Anamnesis;

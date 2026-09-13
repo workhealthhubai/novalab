@@ -9,6 +9,7 @@ export const passwordSchema = z
   .regex(PASSWORD_RULE, 'Şifre harf ve rakam içermeli');
 
 export const userSchema = z.object({
+  companyId: z.uuid().nullable().optional(),
   firstName: z.string().trim().min(1, 'Ad zorunludur').max(100),
   lastName: z.string().trim().min(1, 'Soyad zorunludur').max(100),
   email: z.email('Geçerli bir e-posta girin').max(254),

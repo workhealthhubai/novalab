@@ -81,6 +81,7 @@ services:
       VERBOSE_ENABLED: 'false'
       VERBOSE_STARTUP: 'false'
       DICOM_WEB_PLUGIN_ENABLED: 'true'
+      WORKLISTS_PLUGIN_ENABLED: 'true'
       POSTGRESQL_PLUGIN_ENABLED: 'true'
       ORTHANC_EXPLORER_2_ENABLED: 'true'
       # Index in its own PostgreSQL database; DICOM files on the orthanc_data volume.
@@ -90,10 +91,15 @@ services:
       ORTHANC__POSTGRESQL__USERNAME: ${ORTHANC_DB_USER:-orthanc}
       ORTHANC__POSTGRESQL__PASSWORD: ${ORTHANC_DB_PASSWORD:?ORTHANC_DB_PASSWORD is required}
       ORTHANC__DICOM_AET: ${ORTHANC_AET:-OSGB}
+      # Known devices only. Each entry should AllowStore=true and disable Find/Move/Get.
+      ORTHANC__DICOM_MODALITIES: '${ORTHANC_DICOM_MODALITIES_JSON:-{}}'
       ORTHANC__REGISTERED_USERS: '{"${ORTHANC_USERNAME:-orthanc}": "${ORTHANC_PASSWORD:?ORTHANC_PASSWORD is required}"}'
     volumes:
       - orthanc_data:/var/lib/orthanc/db
       - ./infrastructure/orthanc/orthanc.json:/etc/orthanc/orthanc.json:ro
+    ports:
+      # Keep loopback by default. Set ORTHANC_DICOM_BIND to the PACS host's LAN IP for modalities.
+      - '${ORTHANC_DICOM_BIND:-127.0.0.1}:${ORTHANC_DICOM_PORT:-4242}:4242'
     healthcheck:
       test:
         [

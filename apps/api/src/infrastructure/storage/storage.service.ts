@@ -92,7 +92,6 @@ export class StorageService implements OnModuleInit {
       {
         op: 'upload',
         bucket,
-        key: options.key,
         size: options.size,
         contentType: options.contentType,
       },
@@ -102,13 +101,20 @@ export class StorageService implements OnModuleInit {
   }
 
   async download(key: string, bucket = this.defaultBucket): Promise<Readable> {
-    this.logger.info({ op: 'download', bucket, key }, 'Object read');
+    this.logger.info({ op: 'download', bucket }, 'Object read');
     return this.client.getObject(bucket, key);
+  }
+
+  async downloadBuffer(key: string, bucket = this.defaultBucket): Promise<Buffer> {
+    const stream = await this.download(key, bucket);
+    const chunks: Uint8Array[] = [];
+    for await (const chunk of stream as AsyncIterable<Uint8Array>) chunks.push(chunk);
+    return Buffer.concat(chunks);
   }
 
   async delete(key: string, bucket = this.defaultBucket): Promise<void> {
     await this.client.removeObject(bucket, key);
-    this.logger.info({ op: 'delete', bucket, key }, 'Object deleted');
+    this.logger.info({ op: 'delete', bucket }, 'Object deleted');
   }
 
   async exists(key: string, bucket = this.defaultBucket): Promise<boolean> {
@@ -127,7 +133,7 @@ export class StorageService implements OnModuleInit {
       return this.client.presignedPutObject(bucket, key, expires);
     }
     this.logger.info(
-      { op: 'presign', bucket, key, method: options.method ?? 'GET', expires },
+      { op: 'presign', bucket, method: options.method ?? 'GET', expires },
       'Presigned URL issued',
     );
     const responseHeaders = options.downloadFileName

@@ -1,6 +1,4 @@
-import { PATHS } from '@/app/router/navigation';
-import { ModulePlaceholder } from '../module-placeholder';
-
+import { OperationPage } from '@/features/operations/operation-page';
 export function DoctorPayoutsPage() {
-  return <ModulePlaceholder path={PATHS.doctorPayouts} />;
+  return <OperationPage key="payouts" kind="payouts" />;
 }

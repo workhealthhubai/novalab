@@ -92,7 +92,10 @@ export function useUpdateProtocolItem(id: string) {
 export function useProtocolLifecycle(id: string) {
   const invalidate = useInvalidate();
   const close = useMutation({
-    mutationFn: (cancelPending: boolean) => protocolsService.close(id, cancelPending),
+    mutationFn: (input: boolean | { cancelPending: boolean; cancellationReason: string }) =>
+      typeof input === 'boolean'
+        ? protocolsService.close(id, input)
+        : protocolsService.close(id, input.cancelPending, input.cancellationReason),
     onSuccess: invalidate,
   });
   const cancel = useMutation({

@@ -4,6 +4,7 @@ import { PrismaService } from '@/infrastructure/prisma/prisma.service';
 
 /** Shape used to build the AuthenticatedUser principal. */
 export const userWithAccessInclude = {
+  company: { select: { id: true, deletedAt: true } },
   tenant: { select: { id: true, status: true, slug: true } },
   userRoles: {
     include: {
@@ -87,6 +88,7 @@ export class UsersRepository {
       firstName: string;
       lastName: string;
       status?: UserStatus;
+      companyId?: string | null;
     },
     roleIds: string[],
   ): Promise<User> {
@@ -98,6 +100,7 @@ export class UsersRepository {
         firstName: data.firstName,
         lastName: data.lastName,
         status: data.status ?? 'ACTIVE',
+        companyId: data.companyId ?? null,
         userRoles: { create: roleIds.map((roleId) => ({ tenantId, roleId })) },
       },
     });
@@ -112,7 +115,7 @@ export class UsersRepository {
     return count;
   }
 
-  update(tenantId: string, id: string, data: Prisma.UserUpdateInput): Promise<User> {
+  update(tenantId: string, id: string, data: Prisma.UserUncheckedUpdateInput): Promise<User> {
     // updateMany + re-read keeps the tenant filter in the WHERE clause.
     return this.prisma.$transaction(async (tx) => {
       const { count } = await tx.user.updateMany({
@@ -135,6 +138,10 @@ export class UsersRepository {
         data: roleIds.map((roleId) => ({ tenantId, userId, roleId })),
       }),
     ]);
+  }
+
+  async companyExists(tenantId: string, id: string): Promise<boolean> {
+    return (await this.prisma.company.count({ where: { tenantId, id, deletedAt: null } })) > 0;
   }
 
   countRolesInTenant(tenantId: string, roleIds: string[]): Promise<number> {

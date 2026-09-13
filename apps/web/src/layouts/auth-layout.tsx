@@ -4,9 +4,9 @@ import { PATHS } from '@/app/router/navigation';
 import { useAuth } from '@/hooks/use-auth';
 
 /** Public shell for /login: canvas background, centred card, product mark above. */
-export function AuthLayout() {
+export function AuthLayout({ allowAuthenticated = false }: { allowAuthenticated?: boolean }) {
   const { isAuthenticated } = useAuth();
-  if (isAuthenticated) return <Navigate to={PATHS.dashboard} replace />;
+  if (isAuthenticated && !allowAuthenticated) return <Navigate to={PATHS.dashboard} replace />;
 
   return (
     <div className="flex min-h-dvh flex-col items-center justify-center bg-background px-4 py-10">

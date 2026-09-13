@@ -5,6 +5,8 @@ import {
   Injectable,
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
+import { COMPANY_SCOPE_KEY } from '../decorators/company-scoped.decorator';
+import { companyScope, isCompanyAccount } from '../policies/company-scope';
 import type { Permission } from '@osgb/shared-types';
 import {
   PERMISSIONS_KEY,
@@ -22,6 +24,19 @@ export class PermissionsGuard implements CanActivate {
   constructor(private readonly reflector: Reflector) {}
 
   canActivate(context: ExecutionContext): boolean {
+    const actor = context.switchToHttp().getRequest<RequestWithUser>().user;
+    if (actor && isCompanyAccount(actor)) {
+      // Default deny: adding a new permission/route cannot silently expose tenant-wide data.
+      const scopeMode = this.reflector.get<string>(COMPANY_SCOPE_KEY, context.getHandler());
+      if (scopeMode !== 'self') {
+        companyScope(actor);
+        if (scopeMode !== 'scoped')
+          throw new ForbiddenException({
+            message: 'Bu işlem firma hesabına açık değildir.',
+            errorCode: 'COMPANY_ACCESS_DENIED',
+          });
+      }
+    }
     const required = this.reflector.getAllAndOverride<Permission[] | undefined>(PERMISSIONS_KEY, [
       context.getHandler(),
       context.getClass(),

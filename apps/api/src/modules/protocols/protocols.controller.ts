@@ -57,7 +57,9 @@ export class ProtocolsController {
 
   @Get(':id/records')
   @RequirePermissions(PERMISSIONS.PROTOCOLS_READ)
-  @ApiOperation({ summary: 'Doctor-module records linked to the protocol, per item type' })
+  @ApiOperation({
+    summary: 'Operational links and states for records; no clinical measurements or decisions',
+  })
   records(@CurrentTenant() tenantId: string, @Param() { id }: IdParamDto) {
     return this.protocols.records(tenantId, id);
   }

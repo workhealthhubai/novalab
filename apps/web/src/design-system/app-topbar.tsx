@@ -1,5 +1,6 @@
+import { SYSTEM_ROLES } from '@osgb/shared-types';
 import { useQuery } from '@tanstack/react-query';
-import { Bell, Building, LogOut, Menu, UserRound } from 'lucide-react';
+import { Bell, Building, CheckCheck, LogOut, Menu, UserRound } from 'lucide-react';
 import { useState } from 'react';
 import { useLocation, useNavigate } from 'react-router';
 import { findNavLeaf, findNavSection, PATHS } from '@/app/router/navigation';
@@ -12,20 +13,22 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Sheet, SheetContent, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
-import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { useAuth, useLogout } from '@/hooks/use-auth';
+import { useNotificationMutations, useNotifications } from '@/hooks/use-notifications';
 import { initials } from '@/lib/utils';
 import { tenantsService } from '@/services/tenants.service';
 import { AppSidebar } from './app-sidebar';
 
 /**
  * Figma "TopBar": 64px, surface background, bottom border, "Section › Page" on the left,
- * utilities on the right. Tenant switching and notifications are still placeholders.
+ * utilities on the right. Tenant switching remains intentionally single-tenant per session.
  */
 export function AppTopbar() {
   const location = useLocation();
   const navigate = useNavigate();
   const { user } = useAuth();
+  const companyAccount =
+    Boolean(user?.companyId) || Boolean(user?.roles.includes(SYSTEM_ROLES.COMPANY_REPRESENTATIVE));
   const logout = useLogout();
   const [drawerOpen, setDrawerOpen] = useState(false);
   const currentLeaf = findNavLeaf(location.pathname);
@@ -34,7 +37,10 @@ export function AppTopbar() {
     queryKey: ['tenant', 'current'],
     queryFn: () => tenantsService.current(),
     staleTime: 5 * 60_000,
+    enabled: !companyAccount,
   });
+  const notifications = useNotifications(!companyAccount);
+  const { markRead, markAllRead } = useNotificationMutations();
 
   const displayName = user ? `${user.firstName} ${user.lastName}` : '';
 
@@ -84,23 +90,80 @@ export function AppTopbar() {
         >
           <Building className="size-4 text-muted-foreground" aria-hidden />
           <span className="max-w-40 truncate">
-            {tenant.data?.name ?? (tenant.isPending ? '…' : 'Kurum')}
+            {companyAccount
+              ? 'Firma hesabı'
+              : (tenant.data?.name ?? (tenant.isPending ? '…' : 'Kurum'))}
           </span>
         </div>
 
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="relative text-muted-foreground hover:text-foreground"
-              aria-label="Bildirimler"
-            >
-              <Bell className="size-5" />
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent>Bildirimler</TooltipContent>
-        </Tooltip>
+        {!companyAccount ? (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="relative text-muted-foreground hover:text-foreground"
+                aria-label="Bildirimler"
+              >
+                <Bell className="size-5" />
+                {(notifications.data?.unreadCount ?? 0) > 0 ? (
+                  <span className="absolute top-1 right-1 flex size-4 items-center justify-center rounded-full bg-destructive text-[9px] font-bold text-destructive-foreground">
+                    {Math.min(notifications.data!.unreadCount, 9)}
+                  </span>
+                ) : null}
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-96">
+              <div className="flex items-center justify-between px-2.5 py-2">
+                <p className="text-sm font-semibold">Bildirimler</p>
+                {(notifications.data?.unreadCount ?? 0) > 0 ? (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 px-2 text-xs"
+                    disabled={markAllRead.isPending}
+                    onClick={() => markAllRead.mutate()}
+                  >
+                    <CheckCheck className="size-3.5" />
+                    Tümünü oku
+                  </Button>
+                ) : null}
+              </div>
+              <DropdownMenuSeparator />
+              {notifications.isPending ? (
+                <p className="px-2.5 py-4 text-sm text-muted-foreground">Yükleniyor…</p>
+              ) : null}
+              {notifications.error ? (
+                <p className="px-2.5 py-4 text-sm text-destructive">Bildirimler alınamadı.</p>
+              ) : null}
+              {notifications.data?.items.length === 0 ? (
+                <p className="px-2.5 py-4 text-sm text-muted-foreground">Yeni bildirim yok.</p>
+              ) : null}
+              {notifications.data?.items.map((notification) => (
+                <DropdownMenuItem
+                  key={notification.id}
+                  className={
+                    notification.readAt
+                      ? 'items-start py-2.5'
+                      : 'items-start bg-primary-soft/40 py-2.5'
+                  }
+                  onSelect={(event) => {
+                    event.preventDefault();
+                    if (!notification.readAt) markRead.mutate(notification.id);
+                  }}
+                >
+                  <Bell className="mt-0.5" />
+                  <span className="min-w-0">
+                    <span className="block text-sm font-medium">{notification.title}</span>
+                    <span className="mt-0.5 block whitespace-normal text-xs text-muted-foreground">
+                      {notification.body}
+                    </span>
+                  </span>
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        ) : null}
 
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
@@ -123,10 +186,12 @@ export function AppTopbar() {
               ) : null}
             </div>
             <DropdownMenuSeparator />
-            <DropdownMenuItem onSelect={() => void navigate(PATHS.organization)}>
-              <UserRound />
-              Profil
-            </DropdownMenuItem>
+            {!companyAccount ? (
+              <DropdownMenuItem onSelect={() => void navigate(PATHS.organization)}>
+                <UserRound />
+                Profil
+              </DropdownMenuItem>
+            ) : null}
             <DropdownMenuSeparator />
             <DropdownMenuItem
               variant="destructive"

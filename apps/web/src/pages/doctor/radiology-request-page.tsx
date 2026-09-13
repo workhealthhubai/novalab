@@ -1,5 +1,5 @@
 import { PERMISSIONS } from '@osgb/shared-types';
-import { Ban, ExternalLink, Link2, Save } from 'lucide-react';
+import { Ban, ExternalLink, Link2, RefreshCw, Save } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router';
 import { PATHS } from '@/app/router/navigation';
@@ -63,7 +63,7 @@ export function RadiologyRequestPage() {
   const study = useStudy(requestId, linked);
   const preview = useStudyPreview(requestId, r?.studyInstanceUid ?? null);
   const previewUrl = useObjectUrl(preview.data);
-  const { cancel, report } = useRadiologyMutations();
+  const { cancel, report, retryWorklist } = useRadiologyMutations();
   const [linkOpen, setLinkOpen] = useState(false);
   const [cancelOpen, setCancelOpen] = useState(false);
   const [opening, setOpening] = useState(false);
@@ -137,6 +137,8 @@ export function RadiologyRequestPage() {
               <Field label="Modalite" value={MODALITY_LABELS[r.modality]} />
               <Field label="Bölge / tetkik" value={r.bodyPart} />
               <Field label="İstek tarihi" value={formatDateTime(r.requestedAt)} />
+              <Field label="Erişim no" value={r.accessionNumber} mono />
+              <Field label="Cihaz iş listesi" value={r.worklistStatus} />
               <Field
                 label="Görüntü alındı"
                 value={r.completedAt ? formatDateTime(r.completedAt) : null}
@@ -147,6 +149,26 @@ export function RadiologyRequestPage() {
                 <p className="text-xs text-muted-foreground">Klinik bilgi</p>
                 <p className="text-sm whitespace-pre-wrap">{r.clinicalInfo}</p>
               </div>
+            ) : null}
+            {!linked && (r.worklistStatus === 'FAILED' || r.worklistStatus === 'NOT_CONFIGURED') ? (
+              <Can permission={PERMISSIONS.RADIOLOGY_CREATE}>
+                <AppButton
+                  className="mt-3"
+                  size="sm"
+                  variant="secondary"
+                  loading={retryWorklist.isPending}
+                  onClick={() =>
+                    retryWorklist.mutate(r.id, {
+                      onSuccess: () => toast.success('Cihaz iş listesi yenilendi'),
+                      onError: (error) =>
+                        toast.error('İş listesi yayınlanamadı', toApiError(error).message),
+                    })
+                  }
+                >
+                  <RefreshCw />
+                  İş listesini yeniden yayınla
+                </AppButton>
+              </Can>
             ) : null}
             <Link
               to={patientPath(r.employee.id)}

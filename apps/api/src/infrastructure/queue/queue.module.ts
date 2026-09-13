@@ -2,6 +2,7 @@ import { BullModule } from '@nestjs/bullmq';
 import { Global, Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import type { AppConfig } from '@/config/configuration';
+import { RadiologyModule } from '@/modules/radiology/radiology.module';
 import { DocumentsProcessor } from './processors/documents.processor';
 import { NotificationsProcessor } from './processors/notifications.processor';
 import { ReportsProcessor } from './processors/reports.processor';
@@ -18,6 +19,7 @@ import { QueueService } from './queue.service';
 @Global()
 @Module({
   imports: [
+    RadiologyModule,
     BullModule.forRootAsync({
       imports: [ConfigModule],
       inject: [ConfigService],

@@ -7,6 +7,7 @@ export interface RoleRef {
 
 export interface StaffUser {
   id: string;
+  companyId?: string | null;
   email: string;
   firstName: string;
   lastName: string;
@@ -29,6 +30,7 @@ export interface Role {
 }
 
 export interface CreateUserInput {
+  companyId?: string | null;
   email: string;
   password: string;
   firstName: string;
@@ -37,6 +39,7 @@ export interface CreateUserInput {
 }
 
 export interface UpdateUserInput {
+  companyId?: string | null;
   email?: string;
   firstName?: string;
   lastName?: string;

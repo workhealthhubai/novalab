@@ -82,6 +82,31 @@ export class RadiologyRepository {
     });
   }
 
+  findExaminationContext(tenantId: string, examinationId: string) {
+    return this.prisma.examination.findFirst({
+      where: { id: examinationId, tenantId, deletedAt: null },
+      select: { id: true, employeeId: true },
+    });
+  }
+
+  findStationConfiguration(tenantId: string) {
+    return this.prisma.organizationProfile.findUnique({
+      where: { tenantId },
+      select: { radiologyStationAet: true },
+    });
+  }
+
+  async configuredTenantIds(): Promise<string[]> {
+    const rows = await this.prisma.organizationProfile.findMany({
+      where: {
+        radiologyStationAet: { not: null },
+        tenant: { status: 'ACTIVE', deletedAt: null },
+      },
+      select: { tenantId: true },
+    });
+    return rows.map((row) => row.tenantId);
+  }
+
   create(
     tenantId: string,
     data: Omit<Prisma.RadiologyRequestUncheckedCreateInput, 'tenantId'>,
@@ -101,12 +126,103 @@ export class RadiologyRepository {
     return this.prisma.radiologyRequest.findUniqueOrThrow({ where: { id } });
   }
 
-  /** StudyInstanceUIDs already attached to a live request of the tenant. */
-  async linkedStudyUids(tenantId: string): Promise<Set<string>> {
+  /** StudyInstanceUIDs already claimed anywhere in the shared PACS. */
+  async linkedStudyUids(): Promise<Set<string>> {
     const rows = await this.prisma.radiologyRequest.findMany({
-      where: { tenantId, deletedAt: null, studyInstanceUid: { not: null } },
+      where: { studyInstanceUid: { not: null } },
       select: { studyInstanceUid: true },
     });
     return new Set(rows.flatMap((r) => (r.studyInstanceUid ? [r.studyInstanceUid] : [])));
+  }
+
+  findStudyOwner(studyInstanceUid: string) {
+    return this.prisma.radiologyRequest.findUnique({
+      where: { studyInstanceUid },
+      select: { id: true },
+    });
+  }
+
+  /** Tenant-owned deterministic identifiers for orders waiting for a PACS study. */
+  unlinkedOrders(tenantId: string, limit: number) {
+    return this.prisma.radiologyRequest.findMany({
+      where: {
+        tenantId,
+        deletedAt: null,
+        studyInstanceUid: null,
+        status: { not: 'CANCELLED' },
+      },
+      select: { id: true, employeeId: true, accessionNumber: true },
+      orderBy: { requestedAt: 'desc' },
+      take: limit,
+    });
+  }
+
+  retryableWorklists(tenantId: string, limit: number, maxAttempts: number, now: Date) {
+    return this.prisma.radiologyRequest.findMany({
+      where: {
+        tenantId,
+        deletedAt: null,
+        status: { not: 'CANCELLED' },
+        worklistStatus: 'FAILED',
+        worklistAttemptCount: { lt: maxAttempts },
+        OR: [{ worklistNextAttemptAt: null }, { worklistNextAttemptAt: { lte: now } }],
+      },
+      select: { id: true, studyInstanceUid: true, worklistId: true, worklistAttemptCount: true },
+      orderBy: [{ worklistNextAttemptAt: 'asc' }, { requestedAt: 'asc' }],
+      take: limit,
+    });
+  }
+
+  async operationsSummary(tenantId: string, maxAttempts: number, today: Date) {
+    const outstanding = {
+      tenantId,
+      deletedAt: null,
+      studyInstanceUid: null,
+      status: { not: 'CANCELLED' as const },
+    };
+    const [
+      awaitingStudy,
+      pendingWorklists,
+      publishedWorklists,
+      failedWorklists,
+      exhaustedWorklists,
+      completedToday,
+      latestSync,
+    ] = await this.prisma.$transaction([
+      this.prisma.radiologyRequest.count({ where: outstanding }),
+      this.prisma.radiologyRequest.count({
+        where: { ...outstanding, worklistStatus: 'PENDING' },
+      }),
+      this.prisma.radiologyRequest.count({
+        where: { ...outstanding, worklistStatus: 'PUBLISHED' },
+      }),
+      this.prisma.radiologyRequest.count({
+        where: { tenantId, deletedAt: null, worklistStatus: 'FAILED' },
+      }),
+      this.prisma.radiologyRequest.count({
+        where: {
+          tenantId,
+          deletedAt: null,
+          worklistStatus: 'FAILED',
+          worklistAttemptCount: { gte: maxAttempts },
+        },
+      }),
+      this.prisma.radiologyRequest.count({
+        where: { tenantId, deletedAt: null, completedAt: { gte: today } },
+      }),
+      this.prisma.radiologyRequest.aggregate({
+        where: { tenantId, deletedAt: null, worklistSyncedAt: { not: null } },
+        _max: { worklistSyncedAt: true },
+      }),
+    ]);
+    return {
+      awaitingStudy,
+      pendingWorklists,
+      publishedWorklists,
+      failedWorklists,
+      exhaustedWorklists,
+      completedToday,
+      lastWorklistSyncAt: latestSync._max.worklistSyncedAt,
+    };
   }
 }

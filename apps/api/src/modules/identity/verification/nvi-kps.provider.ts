@@ -75,7 +75,6 @@ export class NviKpsVerificationProvider implements CitizenVerificationProvider {
           status: response.status,
           durationMs: Date.now() - startedAt,
           verdict,
-          nationalIdSuffix: request.nationalId.slice(-3),
         },
         'NVI KPS verification',
       );

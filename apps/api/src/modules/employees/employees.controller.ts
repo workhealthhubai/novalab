@@ -17,6 +17,7 @@ import {
   UseInterceptors,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
+import { CompanyScoped } from '@/common/decorators/company-scoped.decorator';
 import { ApiBearerAuth, ApiBody, ApiConsumes, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { PERMISSIONS } from '@osgb/shared-types';
 import type { Response } from 'express';
@@ -46,15 +47,25 @@ export class EmployeesController {
   constructor(private readonly employees: EmployeesService) {}
 
   @Get()
+  @CompanyScoped()
   @RequirePermissions(PERMISSIONS.EMPLOYEES_READ)
-  list(@CurrentTenant() tenantId: string, @Query() query: EmployeeQueryDto) {
-    return this.employees.list(tenantId, query);
+  list(
+    @CurrentTenant() tenantId: string,
+    @CurrentUser() actor: AuthenticatedUser,
+    @Query() query: EmployeeQueryDto,
+  ) {
+    return this.employees.list(tenantId, actor, query);
   }
 
   @Get(':id')
+  @CompanyScoped()
   @RequirePermissions(PERMISSIONS.EMPLOYEES_READ)
-  get(@CurrentTenant() tenantId: string, @Param() { id }: IdParamDto) {
-    return this.employees.get(tenantId, id);
+  get(
+    @CurrentTenant() tenantId: string,
+    @CurrentUser() actor: AuthenticatedUser,
+    @Param() { id }: IdParamDto,
+  ) {
+    return this.employees.getForActor(tenantId, actor, id);
   }
 
   @Post()

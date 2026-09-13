@@ -11,6 +11,7 @@ import { Reflector } from '@nestjs/core';
 import type { Observable } from 'rxjs';
 import { tap } from 'rxjs/operators';
 import { AuditService } from '@/modules/audit/audit.service';
+import { safeRequestPath } from '@/common/utils/safe-request-path';
 import { AUDIT_KEY, type AuditOptions } from '../decorators/audit.decorator';
 import {
   extractRequestContext,
@@ -29,9 +30,22 @@ const REDACTED_KEYS = new Set([
   'secret',
   'authorization',
   'apikey',
+  'nationalid',
+  'passportnumber',
+  'firstname',
+  'lastname',
+  'birthdate',
+  'anamnesis',
+  'systemsexam',
+  'findings',
+  'conclusion',
+  'reporttext',
+  'signature',
+  'signaturekey',
+  'notes',
+  'clinicalinfo',
 ]);
 const MAX_STRING = 2_000;
-const MAX_BODY_JSON = 20_000;
 
 /** Removes secrets and shrinks large payloads before they are persisted in the audit trail. */
 export function sanitizeForAudit(value: unknown, depth = 0): unknown {
@@ -52,14 +66,11 @@ export function sanitizeForAudit(value: unknown, depth = 0): unknown {
   return result;
 }
 
-function boundedBody(body: unknown): unknown {
-  const sanitized = sanitizeForAudit(body);
-  if (sanitized === undefined || sanitized === null) return undefined;
-  try {
-    return JSON.stringify(sanitized).length > MAX_BODY_JSON ? { _truncated: true } : sanitized;
-  } catch {
-    return { _unserializable: true };
-  }
+/** Generic HTTP audit stores field names only; services add deliberately allow-listed values. */
+function changedFields(body: unknown): { changedFields: string[] } | undefined {
+  if (typeof body !== 'object' || body === null || Array.isArray(body) || Buffer.isBuffer(body))
+    return undefined;
+  return { changedFields: Object.keys(body).slice(0, 100) };
 }
 
 function extractEntityId(body: unknown): string | null {
@@ -122,10 +133,10 @@ export class AuditInterceptor implements NestInterceptor {
             ...base,
             entityId:
               entityIdFromParams ?? (body instanceof StreamableFile ? null : extractEntityId(body)),
-            newValue: boundedBody(request.body),
+            newValue: changedFields(request.body),
             metadata: {
               method,
-              path: request.originalUrl,
+              path: safeRequestPath(routePath),
               statusCode: successStatus,
               durationMs: Date.now() - startedAt,
               outcome: 'SUCCESS',
@@ -146,10 +157,10 @@ export class AuditInterceptor implements NestInterceptor {
           void this.audit.log({
             ...base,
             entityId: entityIdFromParams,
-            newValue: boundedBody(request.body),
+            newValue: changedFields(request.body),
             metadata: {
               method,
-              path: request.originalUrl,
+              path: safeRequestPath(routePath),
               statusCode,
               durationMs: Date.now() - startedAt,
               outcome: 'FAILURE',

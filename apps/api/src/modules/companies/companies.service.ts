@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { AuditAction } from '@osgb/shared-types';
 import type { AuthenticatedUser, RequestContext } from '@/common/interfaces';
+import { companyScope } from '@/common/policies/company-scope';
 import { paginate, toSkipTake } from '@/common/utils/pagination';
 import { AuditService } from '@/modules/audit/audit.service';
 import { CompaniesRepository } from './companies.repository';
@@ -15,14 +16,20 @@ export class CompaniesService {
     private readonly audit: AuditService,
   ) {}
 
-  async list(tenantId: string, query: CompanyQueryDto) {
+  async list(tenantId: string, query: CompanyQueryDto, actor?: AuthenticatedUser) {
     const { skip, take } = toSkipTake(query.page, query.pageSize);
-    const [items, total] = await this.companies.findMany(tenantId, skip, take, query.search);
+    const [items, total] = await this.companies.findMany(
+      tenantId,
+      skip,
+      take,
+      query.search,
+      companyScope(actor),
+    );
     return paginate(items, query.page, query.pageSize, total);
   }
 
-  async get(tenantId: string, id: string) {
-    const company = await this.companies.findById(tenantId, id);
+  async get(tenantId: string, id: string, actor?: AuthenticatedUser) {
+    const company = await this.companies.findById(tenantId, id, companyScope(actor));
     if (!company) throw new NotFoundException('Company not found');
     return company;
   }

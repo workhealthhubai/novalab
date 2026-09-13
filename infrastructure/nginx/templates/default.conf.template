@@ -53,9 +53,13 @@ server {
     proxy_set_header Content-Length "";
     proxy_set_header Cookie $http_cookie;
     proxy_set_header X-Original-URI $request_uri;
+    proxy_set_header X-Original-Method $request_method;
   }
 
   location /dicom-web/ {
+    limit_except GET HEAD {
+      deny all;
+    }
     auth_request /_dicomweb_auth;
     auth_request_set $osgb_user $upstream_http_x_osgb_user_id;
 

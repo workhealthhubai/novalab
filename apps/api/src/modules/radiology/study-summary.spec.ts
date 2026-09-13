@@ -3,6 +3,8 @@ import {
   dicomDate,
   dicomPersonName,
   dicomTime,
+  studyBelongsToEmployee,
+  studyBelongsToRequest,
   toStudySummary,
   unlinkedOnly,
 } from './study-summary';
@@ -76,5 +78,25 @@ describe('study summary', () => {
     const b = toStudySummary(study({ StudyInstanceUID: '1.2' }, 'b'));
     const dup = toStudySummary(study({ StudyInstanceUID: '1.2' }, 'c'));
     expect(unlinkedOnly([a, b, dup], new Set(['1.1'])).map((s) => s.orthancStudyId)).toEqual(['b']);
+  });
+
+  it('uses the tenant-owned employee UUID as the PACS ownership proof', () => {
+    const summary = toStudySummary(study());
+    expect(studyBelongsToEmployee(summary, 'emp-1')).toBe(true);
+    expect(studyBelongsToEmployee(summary, 'emp-2')).toBe(false);
+    expect(studyBelongsToEmployee({ ...summary, patientId: null }, 'emp-1')).toBe(false);
+  });
+
+  it('requires accession and patient identity for a worklist-created request', () => {
+    const summary = toStudySummary(study({ AccessionNumber: 'NL123' }));
+    expect(studyBelongsToRequest(summary, { employeeId: 'emp-1', accessionNumber: 'NL123' })).toBe(
+      true,
+    );
+    expect(studyBelongsToRequest(summary, { employeeId: 'emp-1', accessionNumber: 'NL999' })).toBe(
+      false,
+    );
+    expect(studyBelongsToRequest(summary, { employeeId: 'emp-2', accessionNumber: 'NL123' })).toBe(
+      false,
+    );
   });
 });

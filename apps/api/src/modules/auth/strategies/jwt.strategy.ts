@@ -5,6 +5,7 @@ import { ExtractJwt, Strategy } from 'passport-jwt';
 import type { AccessTokenPayload, AuthenticatedUser } from '@/common/interfaces';
 import type { AppConfig } from '@/config/configuration';
 import { UsersService } from '@/modules/users/users.service';
+import { RefreshSessionsRepository } from '../refresh-sessions.repository';
 
 /**
  * Validates the access token and loads the principal (roles + permissions) from
@@ -16,6 +17,7 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
   constructor(
     config: ConfigService<AppConfig, true>,
     private readonly users: UsersService,
+    private readonly sessions: RefreshSessionsRepository,
   ) {
     const jwt = config.get('jwt', { infer: true });
     super({
@@ -27,13 +29,16 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
   }
 
   async validate(payload: AccessTokenPayload): Promise<AuthenticatedUser> {
-    if (payload.type !== 'access') {
+    if (payload.type !== 'access' || !payload.sid) {
       throw new UnauthorizedException({
         message: 'Invalid token type',
         errorCode: 'INVALID_TOKEN',
       });
     }
-    const resolved = await this.users.findAuthenticatedUser(payload.sub);
+    const [resolved, session] = await Promise.all([
+      this.users.findAuthenticatedUser(payload.sub),
+      this.sessions.findById(payload.sid),
+    ]);
     if (!resolved || resolved.user.tenantId !== payload.tid) {
       throw new UnauthorizedException({
         message: 'Session is no longer valid',
@@ -52,6 +57,18 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
         errorCode: 'TENANT_SUSPENDED',
       });
     }
-    return { ...resolved.user, ...(payload.sid ? { sessionId: payload.sid } : {}) };
+    if (
+      !session ||
+      session.userId !== payload.sub ||
+      session.tenantId !== payload.tid ||
+      session.revokedAt ||
+      session.expiresAt.getTime() <= Date.now()
+    ) {
+      throw new UnauthorizedException({
+        message: 'Session is no longer valid',
+        errorCode: 'SESSION_REVOKED',
+      });
+    }
+    return { ...resolved.user, sessionId: payload.sid };
   }
 }

@@ -3,11 +3,13 @@ import { Transform } from 'class-transformer';
 import {
   IsDateString,
   IsEnum,
+  IsInt,
   IsObject,
   IsOptional,
   IsString,
   IsUUID,
   MaxLength,
+  Min,
   ValidateIf,
 } from 'class-validator';
 import { ExaminationStatus, FitnessDecision } from '@osgb/shared-types';
@@ -25,6 +27,12 @@ export class CreateReportDto {
 
 /** Report content; the JSON sections are validated in the service against the shared catalogues. */
 export class UpdateReportDto {
+  @ApiPropertyOptional({ minimum: 1, description: 'Optimistic concurrency version from GET' })
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  version?: number;
+
   @ApiPropertyOptional({ description: 'ISO datetime of the examination' })
   @IsOptional()
   @IsDateString()
@@ -85,6 +93,15 @@ export class UpdateReportDto {
 }
 
 export class ReportQueryDto extends PaginationQueryDto {
+  @IsOptional()
+  @IsString()
+  @MaxLength(150)
+  companySearch?: string;
+  @IsOptional()
+  @IsString()
+  @MaxLength(150)
+  physicianSearch?: string;
+
   @ApiPropertyOptional({ format: 'uuid' })
   @IsOptional()
   @IsUUID()

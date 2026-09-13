@@ -25,14 +25,12 @@ const employeeSelect = {
 
 const userSelect = { id: true, firstName: true, lastName: true } satisfies Prisma.UserSelect;
 
-/** The protocol's health report (examination), if opened: enough for a decision badge and a link. */
+/** Operational report state only; fitness decisions are medical data and stay on medical routes. */
 const examinationSummary = {
   where: { deletedAt: null },
   select: {
     id: true,
     status: true,
-    fitnessDecision: true,
-    reportDocumentId: true,
     approvedAt: true,
   },
   orderBy: { createdAt: 'desc' },
@@ -165,10 +163,10 @@ export class ProtocolsRepository {
     return this.prisma.protocolItem.updateMany({ where: { id: itemId, tenantId }, data });
   }
 
-  cancelPendingItems(tenantId: string, protocolId: string) {
+  cancelPendingItems(tenantId: string, protocolId: string, reason?: string) {
     return this.prisma.protocolItem.updateMany({
       where: { tenantId, protocolId, status: 'PENDING' },
-      data: { status: 'CANCELLED' },
+      data: { status: 'CANCELLED', ...(reason ? { note: reason } : {}) },
     });
   }
 

@@ -2,19 +2,23 @@ import { Injectable } from '@nestjs/common';
 import type { RefreshSession } from '@/generated/prisma/client';
 import { PrismaService } from '@/infrastructure/prisma/prisma.service';
 
+export interface NewRefreshSession {
+  id: string;
+  tenantId: string;
+  userId: string;
+  tokenHash: string;
+  expiresAt: Date;
+  userAgent?: string | undefined;
+  ipAddress?: string | undefined;
+}
+
+export class RefreshSessionAlreadyConsumedError extends Error {}
+
 @Injectable()
 export class RefreshSessionsRepository {
   constructor(private readonly prisma: PrismaService) {}
 
-  create(data: {
-    id: string;
-    tenantId: string;
-    userId: string;
-    tokenHash: string;
-    expiresAt: Date;
-    userAgent?: string | undefined;
-    ipAddress?: string | undefined;
-  }): Promise<RefreshSession> {
+  create(data: NewRefreshSession): Promise<RefreshSession> {
     return this.prisma.refreshSession.create({
       data: {
         id: data.id,
@@ -25,6 +29,35 @@ export class RefreshSessionsRepository {
         userAgent: data.userAgent?.slice(0, 512) ?? null,
         ipAddress: data.ipAddress ?? null,
       },
+    });
+  }
+
+  /** Atomically consumes one refresh token and creates its single successor. */
+  rotate(
+    consumed: { id: string; tokenHash: string },
+    replacement: NewRefreshSession,
+  ): Promise<RefreshSession> {
+    return this.prisma.$transaction(async (tx) => {
+      const { count } = await tx.refreshSession.updateMany({
+        where: {
+          id: consumed.id,
+          userId: replacement.userId,
+          tenantId: replacement.tenantId,
+          tokenHash: consumed.tokenHash,
+          revokedAt: null,
+          replacedById: null,
+          expiresAt: { gt: new Date() },
+        },
+        data: { revokedAt: new Date(), replacedById: replacement.id },
+      });
+      if (count !== 1) throw new RefreshSessionAlreadyConsumedError();
+      return tx.refreshSession.create({
+        data: {
+          ...replacement,
+          userAgent: replacement.userAgent?.slice(0, 512) ?? null,
+          ipAddress: replacement.ipAddress ?? null,
+        },
+      });
     });
   }
 

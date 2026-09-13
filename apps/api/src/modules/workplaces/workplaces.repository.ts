@@ -24,9 +24,14 @@ export class WorkplacesRepository {
     ]);
   }
 
-  findById(tenantId: string, id: string) {
+  findById(tenantId: string, id: string, scopeCompanyId?: string) {
     return this.prisma.workplace.findFirst({
-      where: { id, tenantId, deletedAt: null },
+      where: {
+        id,
+        tenantId,
+        deletedAt: null,
+        ...(scopeCompanyId ? { companyId: scopeCompanyId } : {}),
+      },
       include: {
         company: { select: { id: true, name: true } },
         branch: { select: { id: true, name: true } },

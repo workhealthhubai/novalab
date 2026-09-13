@@ -10,24 +10,6 @@ export interface RecordLink {
   alert?: boolean;
 }
 
-const RESULT_TR: Record<string, string> = {
-  NORMAL: 'Normal',
-  BORDERLINE: 'Sınırda',
-  ABNORMAL: 'Anormal',
-  OBSTRUCTIVE: 'Obstrüktif',
-  RESTRICTIVE: 'Restriktif',
-  MIXED: 'Mikst',
-  NEGATIVE: 'Negatif',
-  POSITIVE: 'Pozitif',
-  NONE: 'Normal',
-  GLASSES: 'Gözlük',
-  REFERRAL: 'Sevk',
-  FIT: 'Çalışabilir',
-  FIT_WITH_RESTRICTIONS: 'Şartlı',
-  UNFIT: 'Çalışamaz',
-  PENDING: 'Karar bekliyor',
-};
-
 /** Links from a protocol item to the doctor-module records created for it. */
 export function recordLinks(
   records: ProtocolRecords | undefined,
@@ -35,45 +17,50 @@ export function recordLinks(
 ): RecordLink[] {
   if (!records) return [];
   switch (type) {
+    case 'LAB':
+    case 'ISG_REPORT':
+      return (records.operations ?? [])
+        .filter((r) => r.kind === (type === 'LAB' ? 'lab' : 'isg'))
+        .map((r) => ({
+          id: r.id,
+          label: `${formatDate(r.date)} · ${r.status}`,
+          to: `${type === 'LAB' ? PATHS.labResults : PATHS.isgReports}?protocolId=${r.protocolId}&recordId=${r.id}`,
+        }));
     case 'AUDIOMETRY':
       return records.audiometry.map((r) => ({
         id: r.id,
-        label: `${formatDate(r.performedAt)} · sağ ${r.ptaRight ?? '—'} / sol ${r.ptaLeft ?? '—'} dB`,
+        label: `${formatDate(r.performedAt)} · odyometri kaydı`,
         to: PATHS.audiometryTest.replace(':testId', r.id),
       }));
     case 'SPIROMETRY':
       return records.spirometry.map((r) => ({
         id: r.id,
-        label: `${formatDate(r.performedAt)} · ${r.pattern ? (RESULT_TR[r.pattern] ?? r.pattern) : 'patern yok'}`,
+        label: `${formatDate(r.performedAt)} · spirometri kaydı`,
         to: PATHS.spirometryTest.replace(':testId', r.id),
-        alert: r.pattern !== null && r.pattern !== 'NORMAL',
       }));
     case 'EYE':
       return records.eye.map((r) => ({
         id: r.id,
-        label: `${formatDate(r.performedAt)} · ${RESULT_TR[r.recommendation] ?? r.recommendation}`,
+        label: `${formatDate(r.performedAt)} · göz muayenesi kaydı`,
         to: PATHS.eyeExamination.replace(':examId', r.id),
-        alert: r.recommendation !== 'NONE',
       }));
     case 'ECG':
       return records.ecg.map((r) => ({
         id: r.id,
-        label: `${formatDate(r.performedAt)} · ${r.heartRate ?? '—'}/dk · ${RESULT_TR[r.interpretation] ?? r.interpretation}`,
+        label: `${formatDate(r.performedAt)} · EKG kaydı`,
         to: PATHS.ecgRecord.replace(':recordId', r.id),
-        alert: r.interpretation !== 'NORMAL',
       }));
     case 'PNEUMOCONIOSIS':
       return records.pneumoconiosis.map((r) => ({
         id: r.id,
-        label: `${formatDate(r.readAt)} · ${r.profusion ?? 'okunamaz'} · ${RESULT_TR[r.result] ?? r.result}`,
+        label: `${formatDate(r.readAt)} · pnömokonyoz okuması`,
         to: PATHS.pneumoconiosisReading.replace(':readingId', r.id),
-        alert: r.result !== 'NEGATIVE',
       }));
     case 'RADIOLOGY':
       return records.radiology.map((r) => ({
         id: r.id,
         label:
-          `${formatDate(r.requestedAt)} · ${r.modality} ${r.bodyPart ?? ''} · ${r.studyInstanceUid ? (r.reportedAt ? 'raporlandı' : 'görüntü var') : 'bekliyor'}`.trim(),
+          `${formatDate(r.requestedAt)} · ${r.modality} ${r.bodyPart ?? ''} · ${r.status.toLocaleLowerCase('tr-TR')}`.trim(),
         to: PATHS.radiologyStudy.replace(':requestId', r.id),
       }));
     case 'HEALTH_REPORT':
@@ -81,9 +68,8 @@ export function recordLinks(
         ? [
             {
               id: records.healthReport.id,
-              label: `${records.healthReport.performedAt ? formatDate(records.healthReport.performedAt) : 'tarih yok'} · ${RESULT_TR[records.healthReport.fitnessDecision] ?? records.healthReport.fitnessDecision}${records.healthReport.reportDocumentId ? ' · PDF' : ''}`,
+              label: `${records.healthReport.performedAt ? formatDate(records.healthReport.performedAt) : 'tarih yok'} · rapor ${records.healthReport.status.toLocaleLowerCase('tr-TR')}`,
               to: PATHS.healthReport.replace(':examinationId', records.healthReport.id),
-              alert: records.healthReport.fitnessDecision === 'UNFIT',
             },
           ]
         : [];
@@ -112,6 +98,10 @@ export function entryPath(
       return `${PATHS.pneumoconiosisNew}${q}`;
     case 'RADIOLOGY':
       return `${PATHS.radiology}?patientId=${patientId}&new=1`;
+    case 'LAB':
+      return `${PATHS.labResults}${q}`;
+    case 'ISG_REPORT':
+      return `${PATHS.isgReports}${q}`;
     default:
       return null;
   }

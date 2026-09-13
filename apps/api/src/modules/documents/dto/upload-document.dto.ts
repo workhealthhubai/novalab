@@ -1,6 +1,6 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
-import { IsBoolean, IsEnum, IsOptional, IsUUID } from 'class-validator';
+import { IsDateString, Matches, IsBoolean, IsEnum, IsOptional, IsUUID } from 'class-validator';
 import { DocumentCategory } from '@osgb/shared-types';
 
 /**
@@ -9,12 +9,20 @@ import { DocumentCategory } from '@osgb/shared-types';
  * rejected by the whitelist validation).
  */
 export class UploadDocumentDto {
+  @IsOptional()
+  @IsDateString({ strict: true })
+  @Matches(/^\d{4}-\d{2}-\d{2}$/)
+  expiresAt?: string;
+
   @ApiPropertyOptional({ enum: Object.values(DocumentCategory), default: DocumentCategory.OTHER })
   @IsOptional()
   @IsEnum(DocumentCategory)
   category?: DocumentCategory;
 
-  @ApiPropertyOptional({ description: 'Mark as medical document (stricter access rules)' })
+  @ApiPropertyOptional({
+    description:
+      'Request stricter medical classification; examination links and medical categories force true',
+  })
   @IsOptional()
   @Transform(({ value }) => value === true || value === 'true')
   @IsBoolean()

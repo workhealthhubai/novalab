@@ -10,10 +10,11 @@ import { PrismaService } from '@/infrastructure/prisma/prisma.service';
 export class CompaniesRepository {
   constructor(private readonly prisma: PrismaService) {}
 
-  findMany(tenantId: string, skip: number, take: number, search?: string) {
+  findMany(tenantId: string, skip: number, take: number, search?: string, scopeCompanyId?: string) {
     const where: Prisma.CompanyWhereInput = {
       tenantId,
       deletedAt: null,
+      ...(scopeCompanyId ? { id: scopeCompanyId } : {}),
       ...(search
         ? {
             OR: [
@@ -38,9 +39,14 @@ export class CompaniesRepository {
     ]);
   }
 
-  findById(tenantId: string, id: string) {
+  findById(tenantId: string, id: string, scopeCompanyId?: string) {
     return this.prisma.company.findFirst({
-      where: { id, tenantId, deletedAt: null },
+      where: {
+        id,
+        tenantId,
+        deletedAt: null,
+        ...(scopeCompanyId ? { AND: { id: scopeCompanyId } } : {}),
+      },
       include: {
         branches: { where: { deletedAt: null } },
         workplaces: { where: { deletedAt: null } },

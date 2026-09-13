@@ -1,9 +1,13 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { IsEnum, IsOptional, IsUUID } from 'class-validator';
+import { IsIn, IsEnum, IsOptional, IsUUID } from 'class-validator';
 import { DocumentCategory } from '@osgb/shared-types';
 import { PaginationQueryDto } from '@/common/dto/pagination.dto';
 
 export class DocumentQueryDto extends PaginationQueryDto {
+  @IsOptional()
+  @IsIn(['overdue', '30', '60', '90', 'undated', 'all'])
+  expiry?: 'overdue' | '30' | '60' | '90' | 'undated' | 'all';
+
   @ApiPropertyOptional({ format: 'uuid' })
   @IsOptional()
   @IsUUID()

@@ -1,3 +1,4 @@
+import { OperationsModule } from '@/modules/operations/operations.module';
 import { resolve } from 'node:path';
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
@@ -98,6 +99,7 @@ import { WorkplacesModule } from '@/modules/workplaces/workplaces.module';
     PermissionsModule,
 
     // Business
+    OperationsModule,
     CompaniesModule,
     BranchesModule,
     WorkplacesModule,

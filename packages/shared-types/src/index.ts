@@ -13,3 +13,4 @@ export * from './spirometry';
 export * from './eye';
 export * from './pneumoconiosis';
 export * from './health-report';
+export * from './operations';

@@ -6,7 +6,6 @@ import type {
 } from '@osgb/shared-types';
 import type {
   ExaminationStatus,
-  FitnessDecision,
   RadiologyModality,
   RadiologyRequestStatus,
 } from '@osgb/shared-types';
@@ -25,8 +24,6 @@ export interface ProtocolPatientRef {
 export interface ProtocolExaminationSummary {
   id: string;
   status: ExaminationStatus;
-  fitnessDecision: FitnessDecision;
-  reportDocumentId: string | null;
   approvedAt: string | null;
 }
 
@@ -49,27 +46,26 @@ export interface ProtocolWorklistItem {
 
 /** Doctor-module records linked to a protocol (GET /protocols/:id/records). */
 export interface ProtocolRecords {
+  operations?: Array<{
+    id: string;
+    kind: string;
+    date: string;
+    status: string;
+    protocolId: string | null;
+  }>;
   audiometry: Array<{
     id: string;
     performedAt: string;
-    ptaRight: number | null;
-    ptaLeft: number | null;
-    isBaseline: boolean;
   }>;
   spirometry: Array<{
     id: string;
     performedAt: string;
-    pattern: string | null;
-    fev1: number | null;
-    fvc: number | null;
   }>;
-  eye: Array<{ id: string; performedAt: string; recommendation: string }>;
-  ecg: Array<{ id: string; performedAt: string; interpretation: string; heartRate: number | null }>;
+  eye: Array<{ id: string; performedAt: string }>;
+  ecg: Array<{ id: string; performedAt: string }>;
   pneumoconiosis: Array<{
     id: string;
     readAt: string;
-    result: string;
-    profusion: string | null;
     radiologyRequestId: string | null;
   }>;
   radiology: Array<{
@@ -78,16 +74,12 @@ export interface ProtocolRecords {
     bodyPart: string | null;
     status: RadiologyRequestStatus;
     requestedAt: string;
-    studyInstanceUid: string | null;
-    reportedAt: string | null;
   }>;
   healthReport: {
     id: string;
     status: ExaminationStatus;
-    fitnessDecision: FitnessDecision;
     performedAt: string | null;
     approvedAt: string | null;
-    reportDocumentId: string | null;
   } | null;
 }
 

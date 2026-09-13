@@ -15,6 +15,13 @@ export interface RadiologyRequestListItem {
   status: RadiologyRequestStatus;
   bodyPart: string | null;
   clinicalInfo: string | null;
+  accessionNumber: string | null;
+  worklistId: string | null;
+  worklistStatus: 'NOT_CONFIGURED' | 'PENDING' | 'PUBLISHED' | 'FAILED' | 'REMOVED';
+  worklistSyncedAt: string | null;
+  worklistAttemptCount: number;
+  worklistNextAttemptAt: string | null;
+  worklistLastError: string | null;
   orthancStudyId: string | null;
   studyInstanceUid: string | null;
   requestedAt: string;
@@ -47,6 +54,28 @@ export interface StudySummary {
   patientName: string | null;
   patientBirthDate: string | null;
   isStable: boolean;
+}
+
+export interface IncomingStudy extends StudySummary {
+  requestId: string;
+}
+
+export interface PacsOperationsStatus {
+  checkedAt: string;
+  connection: 'ONLINE' | 'OFFLINE';
+  name: string | null;
+  version: string | null;
+  dicomAet: string | null;
+  dicomPort: number | null;
+  stationAet: string | null;
+  maxWorklistAttempts: number;
+  awaitingStudy: number;
+  pendingWorklists: number;
+  publishedWorklists: number;
+  failedWorklists: number;
+  exhaustedWorklists: number;
+  completedToday: number;
+  lastWorklistSyncAt: string | null;
 }
 
 export interface RadiologyListQuery {

@@ -10,6 +10,10 @@ import { EmployeesRepository } from '@/modules/employees/employees.repository';
 import type { CreateExaminationDto } from './dto/create-examination.dto';
 import type { ExaminationQueryDto } from './dto/examination-query.dto';
 import type { UpdateExaminationDto } from './dto/update-examination.dto';
+import {
+  assertExaminationUpdateTransition,
+  throwExaminationVersionConflict,
+} from './examination-status.policy';
 import { ExaminationsRepository } from './examinations.repository';
 
 function toDate(value: string | undefined): Date | undefined {
@@ -49,6 +53,7 @@ export class ExaminationsService {
         errorCode: 'INVALID_EMPLOYEE',
       });
     }
+    await this.assertPhysician(tenantId, dto.physicianId);
     const examination = await this.examinations.create(tenantId, {
       ...dto,
       scheduledAt: toDate(dto.scheduledAt),
@@ -78,13 +83,9 @@ export class ExaminationsService {
     ctx: RequestContext,
   ) {
     const before = await this.get(tenantId, id);
-    if (before.status === 'APPROVED') {
-      throw new BadRequestException({
-        message: 'Approved examinations are read-only',
-        errorCode: 'EXAMINATION_LOCKED',
-      });
-    }
-    const examination = await this.examinations.update(tenantId, id, {
+    assertExaminationUpdateTransition(before.status, dto.status ?? before.status);
+    await this.assertPhysician(tenantId, dto.physicianId);
+    const examination = await this.examinations.update(tenantId, id, before.version, {
       ...dto,
       scheduledAt: toDate(dto.scheduledAt),
       performedAt: toDate(dto.performedAt),
@@ -202,26 +203,44 @@ export class ExaminationsService {
       seen.add(m.key);
     }
     const now = new Date();
-    await this.prisma.$transaction([
-      this.prisma.examinationMeasurement.deleteMany({
+    await this.prisma.$transaction(async (tx) => {
+      const { count } = await tx.examination.updateMany({
+        where: {
+          id,
+          tenantId,
+          deletedAt: null,
+          status: { not: 'APPROVED' },
+          version: before.version,
+        },
+        data: { version: { increment: 1 } },
+      });
+      if (count !== 1) throwExaminationVersionConflict();
+      await tx.examinationMeasurement.deleteMany({
         where: { tenantId, examinationId: id, key: { notIn: [...seen] } },
-      }),
-      ...dto.measurements.map((m) =>
-        this.prisma.examinationMeasurement.upsert({
-          where: { examinationId_key: { examinationId: id, key: m.key } },
-          create: {
-            tenantId,
-            examinationId: id,
-            key: m.key,
-            value: m.value,
-            note: m.note ?? null,
-            recordedAt: now,
-            recordedById: actor.id,
-          },
-          update: { value: m.value, note: m.note ?? null, recordedAt: now, recordedById: actor.id },
-        }),
-      ),
-    ]);
+      });
+      await Promise.all(
+        dto.measurements.map((m) =>
+          tx.examinationMeasurement.upsert({
+            where: { examinationId_key: { examinationId: id, key: m.key } },
+            create: {
+              tenantId,
+              examinationId: id,
+              key: m.key,
+              value: m.value,
+              note: m.note ?? null,
+              recordedAt: now,
+              recordedById: actor.id,
+            },
+            update: {
+              value: m.value,
+              note: m.note ?? null,
+              recordedAt: now,
+              recordedById: actor.id,
+            },
+          }),
+        ),
+      );
+    });
     // Keys only: the values themselves are medical data and stay out of the audit trail.
     await this.audit.log({
       tenantId,
@@ -239,36 +258,13 @@ export class ExaminationsService {
     return { examinationId: id, measurements: toMeasurementMap(rows) };
   }
 
-  /** Physician sign-off. TODO(business-logic): enforce physician role / e-signature. */
-  async approve(tenantId: string, actor: AuthenticatedUser, id: string, ctx: RequestContext) {
-    const before = await this.get(tenantId, id);
-    if (before.status !== 'COMPLETED') {
+  private async assertPhysician(tenantId: string, physicianId: string | undefined): Promise<void> {
+    if (!physicianId) return;
+    if (!(await this.examinations.physicianUserExists(tenantId, physicianId))) {
       throw new BadRequestException({
-        message: 'Only completed examinations can be approved',
-        errorCode: 'INVALID_STATE',
+        message: 'Physician user not found or inactive in this tenant',
+        errorCode: 'INVALID_PHYSICIAN',
       });
     }
-    if (before.fitnessDecision === 'PENDING') {
-      throw new BadRequestException({
-        message: 'A fitness decision is required before approval',
-        errorCode: 'DECISION_REQUIRED',
-      });
-    }
-    const examination = await this.examinations.update(tenantId, id, {
-      status: 'APPROVED',
-      approvedById: actor.id,
-      approvedAt: new Date(),
-    });
-    await this.audit.log({
-      tenantId,
-      userId: actor.id,
-      action: AuditAction.UPDATE,
-      entityType: 'Examination',
-      entityId: id,
-      oldValue: { status: before.status },
-      newValue: { status: 'APPROVED', fitnessDecision: examination.fitnessDecision },
-      ...ctx,
-    });
-    return examination;
   }
 }

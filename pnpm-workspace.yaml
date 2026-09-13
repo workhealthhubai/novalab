@@ -2,6 +2,15 @@ packages:
   - 'apps/*'
   - 'packages/*'
 
+# Keep vulnerable transitive packages out of deployable and CI dependency graphs.
+# These are pinned until their direct parents publish equivalent minimum versions.
+overrides:
+  decode-uri-component: 0.5.0
+  deepmerge-ts: 8.0.2
+  multer: 2.3.0
+  mysql2: 3.24.4
+  stream-json: 3.6.0
+
 # pnpm blocks lifecycle scripts of dependencies unless explicitly allowed.
 # Only native/binary packages the project actually needs are approved here.
 allowBuilds:

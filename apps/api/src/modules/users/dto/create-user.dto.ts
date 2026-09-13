@@ -12,6 +12,15 @@ import {
 } from 'class-validator';
 
 export class CreateUserDto {
+  @ApiPropertyOptional({
+    format: 'uuid',
+    nullable: true,
+    description: 'Restrict this account to one client company',
+  })
+  @IsOptional()
+  @IsUUID('4')
+  companyId?: string | null;
+
   @ApiProperty({ example: 'jane.doe@example.com' })
   @IsEmail()
   @MaxLength(254)

@@ -1,6 +1,8 @@
 import type { PaginatedResult } from '@osgb/shared-types';
 import type {
   CreateRadiologyRequestInput,
+  IncomingStudy,
+  PacsOperationsStatus,
   RadiologyListQuery,
   RadiologyRequest,
   RadiologyRequestListItem,
@@ -23,6 +25,9 @@ export const radiologyService = {
   async cancel(id: string): Promise<RadiologyRequest> {
     return unwrap(await apiClient.post(`/radiology/${id}/cancel`));
   },
+  async retryWorklist(id: string): Promise<RadiologyRequest> {
+    return unwrap(await apiClient.post(`/radiology/${id}/worklist`));
+  },
   async linkStudy(id: string, studyInstanceUid: string): Promise<RadiologyRequest> {
     return unwrap(await apiClient.patch(`/radiology/${id}/link-study`, { studyInstanceUid }));
   },
@@ -35,8 +40,21 @@ export const radiologyService = {
   async candidates(id: string): Promise<StudySummary[]> {
     return unwrap(await apiClient.get(`/radiology/${id}/pacs-candidates`));
   },
-  async unlinked(limit = 25): Promise<StudySummary[]> {
+  async unlinked(limit = 25): Promise<IncomingStudy[]> {
     return unwrap(await apiClient.get('/radiology/pacs/unlinked', { params: { limit } }));
+  },
+  async operationsStatus(): Promise<PacsOperationsStatus> {
+    return unwrap(await apiClient.get('/radiology/pacs/operations'));
+  },
+  async reconcile(limit = 25): Promise<{
+    checked: number;
+    linked: number;
+    ambiguous: number;
+    waiting: number;
+  }> {
+    return unwrap(
+      await apiClient.post('/radiology/pacs/reconcile', undefined, { params: { limit } }),
+    );
   },
   /** Sets the short-lived DICOMweb cookie and returns the OHIF URL to open. */
   async viewerSession(id: string): Promise<ViewerSession> {

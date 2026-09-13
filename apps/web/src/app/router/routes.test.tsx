@@ -12,6 +12,16 @@ import { adminUser, loginResponse, signInAs } from '@/test/auth-fixtures';
 import { NAV_LEAVES } from './navigation';
 import { routes } from './routes';
 
+vi.mock('@/services/operations.service', () => ({
+  operationsService: {
+    list: vi
+      .fn()
+      .mockResolvedValue({ items: [], meta: { page: 1, pageSize: 20, total: 0, totalPages: 1 } }),
+    summary: vi.fn().mockResolvedValue({ states: [], balanceCents: null }),
+    dashboard: vi.fn().mockResolvedValue({ patients: 0, companies: 0, protocols: 0, reports: 0 }),
+    options: vi.fn().mockResolvedValue([]),
+  },
+}));
 vi.mock('@/services/auth.service', () => ({
   authService: { login: vi.fn(), refresh: vi.fn(), logout: vi.fn(), me: vi.fn() },
 }));
@@ -718,6 +728,13 @@ const { radiologyFixture } = vi.hoisted(() => ({
     status: 'COMPLETED',
     bodyPart: 'Akciğer PA',
     clinicalInfo: 'Periyodik muayene',
+    accessionNumber: 'NL0123456789ABCD',
+    worklistId: 'wl-1',
+    worklistStatus: 'REMOVED',
+    worklistSyncedAt: '2026-09-09T09:00:00.000Z',
+    worklistAttemptCount: 1,
+    worklistNextAttemptAt: null,
+    worklistLastError: null,
     orthancStudyId: 'orth-1',
     studyInstanceUid: '1.2.3.4',
     requestedAt: '2026-09-09T08:00:00.000Z',
@@ -741,6 +758,25 @@ vi.mock('@/services/radiology.service', () => ({
     get: vi.fn().mockResolvedValue(radiologyFixture),
     create: vi.fn(),
     cancel: vi.fn(),
+    retryWorklist: vi.fn(),
+    operationsStatus: vi.fn().mockResolvedValue({
+      checkedAt: '2026-09-12T09:00:00.000Z',
+      connection: 'ONLINE',
+      name: 'Orthanc',
+      version: '1.12.10',
+      dicomAet: 'OSGB',
+      dicomPort: 4242,
+      stationAet: 'XRAY01',
+      maxWorklistAttempts: 5,
+      awaitingStudy: 1,
+      pendingWorklists: 0,
+      publishedWorklists: 1,
+      failedWorklists: 0,
+      exhaustedWorklists: 0,
+      completedToday: 1,
+      lastWorklistSyncAt: '2026-09-12T08:55:00.000Z',
+    }),
+    reconcile: vi.fn().mockResolvedValue({ checked: 0, linked: 0, ambiguous: 0, waiting: 0 }),
     linkStudy: vi.fn(),
     report: vi.fn(),
     study: vi.fn().mockResolvedValue({
@@ -761,6 +797,7 @@ vi.mock('@/services/radiology.service', () => ({
     candidates: vi.fn().mockResolvedValue([]),
     unlinked: vi.fn().mockResolvedValue([
       {
+        requestId: 'rr1',
         orthancStudyId: 'orth-2',
         studyInstanceUid: '1.2.3.5',
         studyDate: '2026-09-08',
@@ -1360,7 +1397,7 @@ describe('application skeleton', () => {
     signInAs();
     renderAt(path);
     expect(await screen.findByRole('heading', { level: 1, name: label })).toBeInTheDocument();
-    expect(screen.getByText('Bu modül sonraki geliştirme fazında eklenecek.')).toBeInTheDocument();
+    expect(screen.queryByText(/sonraki geliştirme fazında/)).not.toBeInTheDocument();
     expect(screen.getAllByRole('link', { current: 'page' }).map((el) => el.textContent)).toEqual([
       label,
     ]);
@@ -1400,6 +1437,26 @@ describe('application skeleton', () => {
     expect(screen.getAllByText('Devam ediyor').length).toBeGreaterThanOrEqual(2); // filter chip + row badge
     expect(screen.getByRole('button', { name: /Yeni Protokol/ })).toBeInTheDocument();
   });
+
+  it.each([
+    ['/patient-registration/protocols', 'Protokol Listesi'],
+    ['/patient-registration/protocols/pr1', 'Protokol 2026-000001'],
+  ])(
+    'lets a registration clerk access %s without medical read permission',
+    async (path, heading) => {
+      signInAs(adminUser, [
+        PERMISSIONS.EMPLOYEES_READ,
+        PERMISSIONS.PROTOCOLS_READ,
+        PERMISSIONS.PROTOCOLS_UPDATE,
+      ]);
+      renderAt(path);
+      expect(await screen.findByRole('heading', { level: 1, name: heading })).toBeInTheDocument();
+      expect(screen.queryByText('Bu sayfaya erişim yetkiniz yok')).not.toBeInTheDocument();
+      expect(screen.getByRole('navigation', { name: 'Ana navigasyon' })).not.toHaveTextContent(
+        'Sağlık Raporları',
+      );
+    },
+  );
 
   it('renders the protocol detail with its items and actions', async () => {
     signInAs();
@@ -1639,7 +1696,7 @@ describe('application skeleton', () => {
       expect(within(table).getByText('Görüntü alındı')).toBeInTheDocument();
     });
     expect(await screen.findByText('LOMBER')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /İstek oluştur ve bağla/ })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Eşleşen isteği aç/ })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Yeni İstek/ })).toBeInTheDocument();
   });
 

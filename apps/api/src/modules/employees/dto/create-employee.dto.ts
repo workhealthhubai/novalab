@@ -160,7 +160,9 @@ export class CreateEmployeeDto {
   @MaxLength(500)
   addressLine?: string;
 
-  @ApiPropertyOptional({ description: 'Uyarı / Açıklama' })
+  @ApiPropertyOptional({
+    description: 'Administrative note only; allergies and other medical data are not allowed',
+  })
   @Transform(emptyToUndefined)
   @IsOptional()
   @IsString()

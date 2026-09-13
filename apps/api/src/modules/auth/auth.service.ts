@@ -3,7 +3,7 @@ import { BadRequestException, Injectable, UnauthorizedException } from '@nestjs/
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { PinoLogger } from 'nestjs-pino';
-import { AuditAction, type LoginResponse, type TokenPair } from '@osgb/shared-types';
+import { AuditAction, PERMISSIONS, type LoginResponse, type TokenPair } from '@osgb/shared-types';
 import type {
   AccessTokenPayload,
   AuthenticatedUser,
@@ -11,21 +11,36 @@ import type {
   RequestContext,
 } from '@/common/interfaces';
 import type { AppConfig } from '@/config/configuration';
+import { PrismaService } from '@/infrastructure/prisma/prisma.service';
 import { AuditService } from '@/modules/audit/audit.service';
 import { UsersService, hashPassword, verifyPassword } from '@/modules/users/users.service';
 import { UsersRepository } from '@/modules/users/users.repository';
 import type { LoginDto } from './dto/login.dto';
-import { RefreshSessionsRepository } from './refresh-sessions.repository';
+import { assertDicomWebRequestScope } from './dicomweb-access';
+import {
+  RefreshSessionAlreadyConsumedError,
+  RefreshSessionsRepository,
+} from './refresh-sessions.repository';
 
 /** Short-lived token that lets the browser reach DICOMweb through Nginx (auth_request). */
 export interface DicomWebTokenPayload {
   sub: string;
   tid: string;
+  sid: string;
+  rid: string;
+  eid: string;
+  suid: string;
   type: 'dicomweb';
 }
 
+export interface DicomWebScope {
+  radiologyRequestId: string;
+  employeeId: string;
+  studyInstanceUid: string;
+}
+
 export const DICOMWEB_COOKIE = 'osgb_dicomweb';
-const DICOMWEB_TOKEN_TTL_SECONDS = 60 * 60;
+const DICOMWEB_TOKEN_TTL_SECONDS = 5 * 60;
 
 function sha256(value: string): string {
   return createHash('sha256').update(value).digest('hex');
@@ -42,6 +57,7 @@ export class AuthService {
     private readonly users: UsersService,
     private readonly usersRepository: UsersRepository,
     private readonly sessions: RefreshSessionsRepository,
+    private readonly prisma: PrismaService,
     private readonly audit: AuditService,
     private readonly logger: PinoLogger,
   ) {
@@ -135,20 +151,7 @@ export class AuthService {
       });
     }
     if (session.revokedAt || session.tokenHash !== presentedHash) {
-      const revoked = await this.sessions.revokeAllForUser(session.userId);
-      this.logger.warn({ userId: session.userId, revoked }, 'Refresh token reuse detected');
-      await this.audit.log({
-        tenantId: session.tenantId,
-        userId: session.userId,
-        action: AuditAction.TOKEN_REUSE_DETECTED,
-        entityType: 'RefreshSession',
-        entityId: session.id,
-        ...ctx,
-      });
-      throw new UnauthorizedException({
-        message: 'Refresh token reuse detected',
-        errorCode: 'REFRESH_TOKEN_REUSED',
-      });
+      return this.rejectRefreshReuse(session, ctx);
     }
     if (session.expiresAt.getTime() < Date.now()) {
       throw new UnauthorizedException({
@@ -165,8 +168,17 @@ export class AuthService {
       });
     }
 
-    const tokens = await this.issueTokenPair(resolved.user, ctx, session.id);
-    return tokens;
+    try {
+      return await this.issueTokenPair(resolved.user, ctx, {
+        id: session.id,
+        tokenHash: presentedHash,
+      });
+    } catch (error) {
+      if (error instanceof RefreshSessionAlreadyConsumedError) {
+        return this.rejectRefreshReuse(session, ctx);
+      }
+      throw error;
+    }
   }
 
   async logout(refreshToken: string, ctx: RequestContext): Promise<void> {
@@ -189,8 +201,25 @@ export class AuthService {
     });
   }
 
-  issueDicomWebToken(user: AuthenticatedUser): { token: string; maxAgeSeconds: number } {
-    const payload: DicomWebTokenPayload = { sub: user.id, tid: user.tenantId, type: 'dicomweb' };
+  issueDicomWebToken(
+    user: AuthenticatedUser,
+    scope: DicomWebScope,
+  ): { token: string; maxAgeSeconds: number } {
+    if (!user.sessionId) {
+      throw new UnauthorizedException({
+        message: 'A revocable login session is required for DICOMweb access',
+        errorCode: 'SESSION_REQUIRED',
+      });
+    }
+    const payload: DicomWebTokenPayload = {
+      sub: user.id,
+      tid: user.tenantId,
+      sid: user.sessionId,
+      rid: scope.radiologyRequestId,
+      eid: scope.employeeId,
+      suid: scope.studyInstanceUid,
+      type: 'dicomweb',
+    };
     const token = this.jwt.sign(payload, {
       secret: this.jwtConfig.accessSecret,
       expiresIn: DICOMWEB_TOKEN_TTL_SECONDS,
@@ -199,19 +228,67 @@ export class AuthService {
     return { token, maxAgeSeconds: DICOMWEB_TOKEN_TTL_SECONDS };
   }
 
-  verifyDicomWebToken(token: string): DicomWebTokenPayload {
+  async verifyDicomWebAccess(
+    token: string,
+    originalUri: string,
+    originalMethod: string,
+  ): Promise<DicomWebTokenPayload> {
     const payload = this.jwt.verify<DicomWebTokenPayload>(token, {
       secret: this.jwtConfig.accessSecret,
       issuer: this.jwtConfig.issuer,
     });
-    if (payload.type !== 'dicomweb') throw new UnauthorizedException('Invalid token type');
+    if (
+      payload.type !== 'dicomweb' ||
+      !payload.sub ||
+      !payload.tid ||
+      !payload.sid ||
+      !payload.rid ||
+      !payload.eid ||
+      !payload.suid
+    )
+      throw new UnauthorizedException('Invalid token type');
+
+    assertDicomWebRequestScope(originalUri, originalMethod, payload.suid);
+
+    const [resolved, session, request] = await Promise.all([
+      this.users.findAuthenticatedUser(payload.sub),
+      this.sessions.findById(payload.sid),
+      this.prisma.radiologyRequest.findFirst({
+        where: {
+          id: payload.rid,
+          tenantId: payload.tid,
+          employeeId: payload.eid,
+          studyInstanceUid: payload.suid,
+          deletedAt: null,
+          status: { not: 'CANCELLED' },
+        },
+        select: { id: true },
+      }),
+    ]);
+    const activePrincipal =
+      resolved?.user.status === 'ACTIVE' &&
+      resolved.tenantStatus === 'ACTIVE' &&
+      resolved.user.tenantId === payload.tid &&
+      resolved.user.permissions.includes(PERMISSIONS.RADIOLOGY_READ);
+    const activeSession =
+      session &&
+      session.userId === payload.sub &&
+      session.tenantId === payload.tid &&
+      !session.revokedAt &&
+      session.expiresAt.getTime() > Date.now();
+    if (!activePrincipal || !activeSession || !request) {
+      throw new UnauthorizedException({
+        message: 'Viewer session is no longer valid',
+        errorCode: 'DICOMWEB_SESSION_INVALID',
+      });
+    }
     return payload;
   }
 
   private async issueTokenPair(
     user: AuthenticatedUser,
     ctx: RequestContext,
-    rotatedFromSessionId?: string,
+    rotatedFrom?: { id: string; tokenHash: string },
   ): Promise<TokenPair> {
     const sessionId = randomUUID();
     const accessPayload: AccessTokenPayload = {
@@ -239,7 +316,7 @@ export class AuthService {
       issuer: this.jwtConfig.issuer,
     });
 
-    await this.sessions.create({
+    const sessionData = {
       id: sessionId,
       tenantId: user.tenantId,
       userId: user.id,
@@ -247,10 +324,9 @@ export class AuthService {
       expiresAt: new Date(Date.now() + this.jwtConfig.refreshExpiresInSeconds * 1000),
       userAgent: ctx.userAgent,
       ipAddress: ctx.ipAddress,
-    });
-    if (rotatedFromSessionId) {
-      await this.sessions.revoke(rotatedFromSessionId, sessionId);
-    }
+    };
+    if (rotatedFrom) await this.sessions.rotate(rotatedFrom, sessionData);
+    else await this.sessions.create(sessionData);
 
     return {
       accessToken,
@@ -258,6 +334,26 @@ export class AuthService {
       expiresIn: this.jwtConfig.accessExpiresInSeconds,
       tokenType: 'Bearer',
     };
+  }
+
+  private async rejectRefreshReuse(
+    session: { id: string; userId: string; tenantId: string },
+    ctx: RequestContext,
+  ): Promise<never> {
+    const revoked = await this.sessions.revokeAllForUser(session.userId);
+    this.logger.warn({ userId: session.userId, revoked }, 'Refresh token reuse detected');
+    await this.audit.log({
+      tenantId: session.tenantId,
+      userId: session.userId,
+      action: AuditAction.TOKEN_REUSE_DETECTED,
+      entityType: 'RefreshSession',
+      entityId: session.id,
+      ...ctx,
+    });
+    throw new UnauthorizedException({
+      message: 'Refresh token reuse detected',
+      errorCode: 'REFRESH_TOKEN_REUSED',
+    });
   }
 
   private verifyRefreshToken(token: string, ignoreExpiration: boolean): RefreshTokenPayload {

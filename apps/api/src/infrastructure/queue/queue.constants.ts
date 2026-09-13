@@ -14,4 +14,5 @@ export const JOBS = {
   GENERATE_EMPLOYEE_REPORT: 'generate-employee-report',
   PROCESS_UPLOADED_DOCUMENT: 'process-uploaded-document',
   EXAMINATION_DUE_REMINDERS: 'examination-due-reminders',
+  PACS_RECONCILIATION: 'pacs-reconciliation',
 } as const;

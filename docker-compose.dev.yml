@@ -26,7 +26,6 @@ services:
     ports:
       # Orthanc REST/UI for development only (http://localhost:8042, credentials from .env).
       - '8042:8042'
-      - '4242:4242'
     environment:
       VERBOSE_ENABLED: 'true'
 

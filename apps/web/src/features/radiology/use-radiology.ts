@@ -10,6 +10,7 @@ export const radiologyKeys = {
   preview: (id: string, version: string | null) => ['radiology', 'preview', id, version] as const,
   candidates: (id: string) => ['radiology', 'candidates', id] as const,
   unlinked: ['radiology', 'unlinked'] as const,
+  operations: ['radiology', 'operations'] as const,
 };
 
 export function useRadiologyRequests(query: RadiologyListQuery) {
@@ -64,6 +65,23 @@ export function useUnlinkedStudies(enabled = true) {
   });
 }
 
+export function usePacsOperationsStatus(enabled = true) {
+  return useQuery({
+    queryKey: radiologyKeys.operations,
+    queryFn: () => radiologyService.operationsStatus(),
+    enabled,
+    refetchInterval: 30_000,
+  });
+}
+
+export function useReconcilePacs() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: () => radiologyService.reconcile(25),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: radiologyKeys.all }),
+  });
+}
+
 export function useRadiologyMutations() {
   const queryClient = useQueryClient();
   const invalidate = () => queryClient.invalidateQueries({ queryKey: radiologyKeys.all });
@@ -74,6 +92,10 @@ export function useRadiologyMutations() {
     }),
     cancel: useMutation({
       mutationFn: (id: string) => radiologyService.cancel(id),
+      onSuccess: invalidate,
+    }),
+    retryWorklist: useMutation({
+      mutationFn: (id: string) => radiologyService.retryWorklist(id),
       onSuccess: invalidate,
     }),
     linkStudy: useMutation({

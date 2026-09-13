@@ -41,6 +41,8 @@ import { isNavSection, type NavEntry, type NavLeaf, type NavSection } from '@/ty
 export const PATHS = {
   login: '/login',
   dashboard: '/dashboard',
+  workItems: '/work-items',
+  documentTracking: '/document-tracking',
 
   // Hasta Kayıt Kabul
   patients: '/patient-registration/patients',
@@ -97,15 +99,26 @@ export const PATHS = {
   subOsgb: '/settings/sub-osgb',
 } as const;
 
-const todo = (subject: string) => `${subject} bu modül altında yer alacak.`;
-
 /** Sidebar tree. Order follows the product specification. */
 export const NAV_TREE: NavEntry[] = [
+  {
+    path: PATHS.workItems,
+    label: 'Eksik İşlemler',
+    icon: ClipboardList,
+    description: 'Bekleyen istemler, onaysız raporlar ve eksik kayıtlar.',
+  },
+  {
+    path: PATHS.documentTracking,
+    label: 'Belge Süre Takibi',
+    icon: FileText,
+    description: 'Sözleşme ve belgelerin bitiş tarihleri.',
+    permission: PERMISSIONS.DOCUMENTS_READ,
+  },
   {
     path: PATHS.dashboard,
     label: 'Dashboard',
     icon: LayoutGrid,
-    description: 'Genel bakış ve özet göstergeler bu alanda yer alacak.',
+    description: 'Güncel göstergeler, açık işler ve modüllere hızlı erişim.',
   },
   {
     id: 'patient-registration',
@@ -117,7 +130,7 @@ export const NAV_TREE: NavEntry[] = [
         path: PATHS.patients,
         label: 'Hasta Kayıt',
         icon: UserPlus,
-        description: todo('Hasta kayıt ve kabul işlemleri'),
+        description: 'Hasta kayıtları, kabul ve kimlik doğrulama.',
         permission: PERMISSIONS.EMPLOYEES_READ,
       },
       {
@@ -125,7 +138,7 @@ export const NAV_TREE: NavEntry[] = [
         label: 'Protokol Listesi',
         icon: ClipboardList,
         description: 'Ziyaret protokolleri, istenen tetkikler ve durum takibi.',
-        permission: PERMISSIONS.EXAMINATIONS_READ,
+        permission: PERMISSIONS.PROTOCOLS_READ,
       },
       {
         path: PATHS.documentSigning,
@@ -202,28 +215,28 @@ export const NAV_TREE: NavEntry[] = [
         path: PATHS.isgReports,
         label: 'İSG Raporları',
         icon: ShieldCheck,
-        description: todo('İSG raporları'),
+        description: 'Firma ve dönem bazında İSG raporları ve protokol takibi.',
         permission: PERMISSIONS.REPORTS_EXPORT,
       },
       {
         path: PATHS.labResults,
         label: 'Lab. Tahlilleri',
         icon: FlaskConical,
-        description: todo('Laboratuvar tahlilleri'),
+        description: 'Protokole bağlı numune ve laboratuvar sonuçları.',
         permission: PERMISSIONS.EXAMINATIONS_READ,
       },
       {
         path: PATHS.reportTemplates,
         label: 'Rapor Şablonları',
         icon: FileText,
-        description: todo('Rapor şablonları'),
+        description: 'Laboratuvar ve İSG raporları için ortak metin şablonları.',
         permission: PERMISSIONS.REPORTS_EXPORT,
       },
       {
         path: PATHS.eSignature,
         label: 'E-İmza',
         icon: BadgeCheck,
-        description: todo('E-imza işlemleri'),
+        description: 'İmzalı belge arşivi ve dosya bütünlüğü doğrulama.',
         permission: PERMISSIONS.EXAMINATIONS_APPROVE,
       },
     ],
@@ -259,7 +272,7 @@ export const NAV_TREE: NavEntry[] = [
         path: PATHS.doctorPayouts,
         label: 'Doktor Hakediş',
         icon: Wallet,
-        description: todo('Doktor hakediş hesaplamaları'),
+        description: 'Hekim, dönem ve hizmet adedine göre hakediş ve ödeme takibi.',
         permission: PERMISSIONS.SYSTEM_MANAGE,
       },
       {
@@ -329,21 +342,21 @@ export const NAV_TREE: NavEntry[] = [
         path: PATHS.accounting,
         label: 'Ön Muhasebe',
         icon: Calculator,
-        description: todo('Ön muhasebe işlemleri'),
+        description: 'Firma bazında gelir, gider, tahsilat ve ödeme takibi.',
         permission: PERMISSIONS.SYSTEM_MANAGE,
       },
       {
         path: PATHS.dicomRecords,
         label: 'DICOM Kayıtları',
         icon: Database,
-        description: todo('DICOM kayıtları'),
+        description: 'PACS çalışmaları, DICOM kayıtları ve eşleştirme takibi.',
         permission: PERMISSIONS.RADIOLOGY_READ,
       },
       {
         path: PATHS.subOsgb,
         label: 'Alt OSGB Tanımları',
         icon: Network,
-        description: todo('Alt OSGB tanımları'),
+        description: 'İş birliği yapılan OSGB kurumlarının iletişim ve yetki bilgileri.',
         permission: PERMISSIONS.SYSTEM_MANAGE,
       },
     ],

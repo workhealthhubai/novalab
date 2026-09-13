@@ -22,6 +22,8 @@ export interface AuthUser {
   firstName: string;
   lastName: string;
   status: UserStatus;
+  companyId?: string | null;
+  companyAccessActive?: boolean;
   roles: string[];
   permissions: Permission[];
 }

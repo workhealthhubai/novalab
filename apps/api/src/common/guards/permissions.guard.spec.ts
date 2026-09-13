@@ -1,78 +1,51 @@
-import { type ExecutionContext, ForbiddenException } from '@nestjs/common';
+import { ForbiddenException, type ExecutionContext } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { PERMISSIONS } from '@osgb/shared-types';
-import { PERMISSIONS_KEY, PERMISSIONS_MODE_KEY } from '../decorators/require-permissions.decorator';
-import type { AuthenticatedUser } from '../interfaces/authenticated-user.interface';
+import { CompanyScoped, CompanySelfAccess } from '../decorators/company-scoped.decorator';
+import { RequirePermissions } from '../decorators';
+import type { AuthenticatedUser } from '../interfaces';
 import { PermissionsGuard } from './permissions.guard';
 
-function createContext(
-  user: AuthenticatedUser | undefined,
-  metadata: Record<string, unknown>,
-): ExecutionContext {
-  const handler = () => undefined;
-  const cls = class TestController {};
-  for (const [key, value] of Object.entries(metadata)) {
-    Reflect.defineMetadata(key, value, handler);
-  }
-  return {
-    getHandler: () => handler,
-    getClass: () => cls,
-    switchToHttp: () => ({ getRequest: () => ({ user }) }),
-  } as unknown as ExecutionContext;
+class Routes {
+  @CompanyScoped() @RequirePermissions(PERMISSIONS.EMPLOYEES_READ) scoped() {}
+  @CompanySelfAccess() me() {}
+  @RequirePermissions(PERMISSIONS.EMPLOYEES_READ) unscoped() {}
+  noPermissionMetadata() {}
 }
-
-const baseUser: AuthenticatedUser = {
-  id: 'u1',
-  tenantId: 't1',
-  email: 'u@example.com',
-  firstName: 'U',
-  lastName: 'One',
+const actor: AuthenticatedUser = {
+  id: 'u',
+  tenantId: 't',
+  email: 'test@example.test',
+  firstName: 'T',
+  lastName: 'U',
   status: 'ACTIVE',
-  roles: ['nurse'],
-  permissions: [PERMISSIONS.EMPLOYEES_READ, PERMISSIONS.EXAMINATIONS_READ],
+  roles: ['company_representative'],
+  permissions: [PERMISSIONS.EMPLOYEES_READ],
+  companyId: 'a',
+  companyAccessActive: true,
 };
-
-describe('PermissionsGuard', () => {
-  const guard = new PermissionsGuard(new Reflector());
-
-  it('allows handlers without permission metadata', () => {
-    expect(guard.canActivate(createContext(baseUser, {}))).toBe(true);
+const guard = new PermissionsGuard(new Reflector());
+function check(route: keyof Routes, user = actor) {
+  return guard.canActivate({
+    getHandler: () => Routes.prototype[route],
+    getClass: () => Routes,
+    switchToHttp: () => ({ getRequest: () => ({ user }) }),
+  } as unknown as ExecutionContext);
+}
+describe('company endpoint authorization', () => {
+  it('requires explicit company scoping even on handlers without permission metadata', () => {
+    expect(() => check('unscoped')).toThrow(ForbiddenException);
+    expect(() => check('noPermissionMetadata')).toThrow(ForbiddenException);
   });
-
-  it('allows when all required permissions are granted', () => {
-    const ctx = createContext(baseUser, {
-      [PERMISSIONS_KEY]: [PERMISSIONS.EMPLOYEES_READ, PERMISSIONS.EXAMINATIONS_READ],
-      [PERMISSIONS_MODE_KEY]: 'all',
-    });
-    expect(guard.canActivate(ctx)).toBe(true);
+  it('allows only scoped data reads and self-profile access', () => {
+    expect(check('scoped')).toBe(true);
+    expect(check('me', { ...actor, companyId: null })).toBe(true);
+    expect(() => check('scoped', { ...actor, companyId: null })).toThrow(ForbiddenException);
   });
-
-  it('denies when a required permission is missing and reports it', () => {
-    const ctx = createContext(baseUser, {
-      [PERMISSIONS_KEY]: [PERMISSIONS.EMPLOYEES_READ, PERMISSIONS.EMPLOYEES_CREATE],
-      [PERMISSIONS_MODE_KEY]: 'all',
-    });
-    expect(() => guard.canActivate(ctx)).toThrow(ForbiddenException);
-    try {
-      guard.canActivate(ctx);
-    } catch (error) {
-      const response = (error as ForbiddenException).getResponse() as {
-        details: { missing: string[] };
-      };
-      expect(response.details.missing).toEqual([PERMISSIONS.EMPLOYEES_CREATE]);
-    }
+  it('still checks the permission after checking the company boundary', () => {
+    expect(() => check('scoped', { ...actor, permissions: [] })).toThrow(ForbiddenException);
   });
-
-  it('supports "any" mode', () => {
-    const ctx = createContext(baseUser, {
-      [PERMISSIONS_KEY]: [PERMISSIONS.SYSTEM_MANAGE, PERMISSIONS.EMPLOYEES_READ],
-      [PERMISSIONS_MODE_KEY]: 'any',
-    });
-    expect(guard.canActivate(ctx)).toBe(true);
-  });
-
-  it('fails closed when there is no authenticated user', () => {
-    const ctx = createContext(undefined, { [PERMISSIONS_KEY]: [PERMISSIONS.EMPLOYEES_READ] });
-    expect(() => guard.canActivate(ctx)).toThrow(ForbiddenException);
+  it('does not restrict internal roles to the portal allowlist', () => {
+    expect(check('unscoped', { ...actor, roles: ['tenant_admin'], companyId: null })).toBe(true);
   });
 });

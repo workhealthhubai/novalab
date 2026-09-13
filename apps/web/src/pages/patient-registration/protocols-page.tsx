@@ -22,7 +22,7 @@ import { toast } from '@/design-system/toast';
 import { maskNationalId, patientPath } from '@/features/patients/patient-utils';
 import { NewProtocolDialog } from '@/features/protocols/new-protocol-dialog';
 import { StatusBadge } from '@/design-system/status-badge';
-import { FITNESS_DECISION } from '@/features/examinations/examination-labels';
+import { EXAMINATION_STATUS } from '@/features/examinations/examination-labels';
 import { ProtocolStatusBadge } from '@/features/protocols/protocol-badges';
 import { ProtocolFilters, type ProtocolFilterValues } from '@/features/protocols/protocol-filters';
 import { PROTOCOL_TYPE_LABELS } from '@/features/protocols/protocol-labels';
@@ -156,12 +156,8 @@ export function ProtocolsPage() {
                         <TableCell>
                           {protocol.examinations[0] ? (
                             <StatusBadge
-                              status={
-                                FITNESS_DECISION[protocol.examinations[0].fitnessDecision].status
-                              }
-                              label={
-                                FITNESS_DECISION[protocol.examinations[0].fitnessDecision].label
-                              }
+                              status={EXAMINATION_STATUS[protocol.examinations[0].status].status}
+                              label={EXAMINATION_STATUS[protocol.examinations[0].status].label}
                             />
                           ) : (
                             <span className="text-muted-foreground">—</span>

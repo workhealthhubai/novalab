@@ -11,6 +11,7 @@ import {
   Query,
   Req,
 } from '@nestjs/common';
+import { CompanyScoped } from '@/common/decorators/company-scoped.decorator';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { PERMISSIONS } from '@osgb/shared-types';
 import { CurrentTenant, CurrentUser, RequirePermissions } from '@/common/decorators';
@@ -32,15 +33,25 @@ export class AppointmentsController {
   constructor(private readonly appointments: AppointmentsService) {}
 
   @Get()
+  @CompanyScoped()
   @RequirePermissions(PERMISSIONS.APPOINTMENTS_READ)
-  list(@CurrentTenant() tenantId: string, @Query() query: AppointmentQueryDto) {
-    return this.appointments.list(tenantId, query);
+  list(
+    @CurrentTenant() tenantId: string,
+    @CurrentUser() actor: AuthenticatedUser,
+    @Query() query: AppointmentQueryDto,
+  ) {
+    return this.appointments.list(tenantId, query, actor);
   }
 
   @Get(':id')
+  @CompanyScoped()
   @RequirePermissions(PERMISSIONS.APPOINTMENTS_READ)
-  get(@CurrentTenant() tenantId: string, @Param() { id }: IdParamDto) {
-    return this.appointments.get(tenantId, id);
+  get(
+    @CurrentTenant() tenantId: string,
+    @CurrentUser() actor: AuthenticatedUser,
+    @Param() { id }: IdParamDto,
+  ) {
+    return this.appointments.getForActor(tenantId, id, actor);
   }
 
   @Post()

@@ -40,8 +40,10 @@ export const protocolsService = {
   ): Promise<Protocol> {
     return unwrap(await apiClient.patch(`/protocols/${id}/items/${itemId}`, input));
   },
-  async close(id: string, cancelPending = false): Promise<Protocol> {
-    return unwrap(await apiClient.post(`/protocols/${id}/close`, { cancelPending }));
+  async close(id: string, cancelPending = false, cancellationReason?: string): Promise<Protocol> {
+    return unwrap(
+      await apiClient.post(`/protocols/${id}/close`, { cancelPending, cancellationReason }),
+    );
   },
   async cancel(id: string): Promise<Protocol> {
     return unwrap(await apiClient.post(`/protocols/${id}/cancel`));

@@ -9,6 +9,12 @@ import type {
   OrthancStudy,
   OrthancSystemInfo,
 } from './orthanc.types';
+import type { OrthancWorklistPayload } from '@/modules/radiology/dicom-worklist';
+
+interface OrthancWorklistResult {
+  ID: string;
+  Path: string;
+}
 
 /**
  * Integration with the Orthanc PACS via its REST API.
@@ -56,6 +62,19 @@ export class OrthancService {
     };
     const results = await this.request<OrthancStudy[]>('POST', '/tools/find', query);
     return results[0] ?? null;
+  }
+
+  async createWorklist(payload: OrthancWorklistPayload): Promise<OrthancWorklistResult> {
+    return this.request<OrthancWorklistResult>('POST', '/worklists/create', payload);
+  }
+
+  async deleteWorklist(worklistId: string): Promise<void> {
+    await this.request<unknown>(
+      'DELETE',
+      `/worklists/${encodeURIComponent(worklistId)}`,
+      undefined,
+      [404],
+    );
   }
 
   /**
@@ -116,19 +135,25 @@ export class OrthancService {
     return Buffer.from(response.data);
   }
 
-  private async request<T>(method: 'GET' | 'POST', url: string, data?: unknown): Promise<T> {
+  private async request<T>(
+    method: 'GET' | 'POST' | 'DELETE',
+    url: string,
+    data?: unknown,
+    ignoredStatuses: readonly number[] = [],
+  ): Promise<T> {
     const startedAt = Date.now();
     try {
       const response = await this.http.request<T>({ method, url, data });
       this.logger.debug(
-        { method, url, status: response.status, durationMs: Date.now() - startedAt },
+        { method, status: response.status, durationMs: Date.now() - startedAt },
         'Orthanc request',
       );
       return response.data;
     } catch (error) {
       const status = isAxiosError(error) ? error.response?.status : undefined;
+      if (status && ignoredStatuses.includes(status)) return undefined as T;
       this.logger.error(
-        { method, url, status, durationMs: Date.now() - startedAt, err: error },
+        { method, status, durationMs: Date.now() - startedAt, err: error },
         'Orthanc request failed',
       );
       throw new ServiceUnavailableException({

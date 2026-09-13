@@ -1,6 +1,4 @@
-import { PATHS } from '@/app/router/navigation';
-import { ModulePlaceholder } from '../module-placeholder';
-
+import { OperationPage } from '@/features/operations/operation-page';
 export function ReportTemplatesPage() {
-  return <ModulePlaceholder path={PATHS.reportTemplates} />;
+  return <OperationPage key="templates" kind="templates" />;
 }

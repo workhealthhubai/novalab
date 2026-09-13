@@ -15,6 +15,7 @@
     "typecheck": "turbo run typecheck",
     "test": "turbo run test",
     "test:e2e": "turbo run test:e2e",
+    "audit": "pnpm audit --audit-level high",
     "format": "prettier --write \"**/*.{ts,tsx,js,cjs,mjs,json,md,yml,yaml}\"",
     "format:check": "prettier --check \"**/*.{ts,tsx,js,cjs,mjs,json,md,yml,yaml}\"",
     "clean": "turbo run clean && rm -rf node_modules",
@@ -26,7 +27,8 @@
     "db:studio": "pnpm --filter @osgb/api prisma:studio",
     "docker:up": "docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d",
     "docker:down": "docker compose -f docker-compose.yml -f docker-compose.dev.yml down",
-    "docker:infra": "docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d postgres redis minio orthanc ohif"
+    "docker:infra": "docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d postgres redis minio orthanc ohif",
+    "dicom:test": "bash scripts/dicom-acceptance.sh"
   },
   "devDependencies": {
     "prettier": "^3.9.6",

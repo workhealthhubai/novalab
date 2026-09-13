@@ -1,6 +1,7 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { AuditAction } from '@osgb/shared-types';
 import type { AuthenticatedUser, RequestContext } from '@/common/interfaces';
+import { companyScope, scopedCompanyFilter } from '@/common/policies/company-scope';
 import { paginate, toSkipTake } from '@/common/utils/pagination';
 import { AuditService } from '@/modules/audit/audit.service';
 import { CompaniesRepository } from '@/modules/companies/companies.repository';
@@ -17,14 +18,19 @@ export class WorkplacesService {
     private readonly audit: AuditService,
   ) {}
 
-  async list(tenantId: string, query: WorkplaceQueryDto) {
+  async list(tenantId: string, query: WorkplaceQueryDto, actor?: AuthenticatedUser) {
     const { skip, take } = toSkipTake(query.page, query.pageSize);
-    const [items, total] = await this.workplaces.findMany(tenantId, skip, take, query.companyId);
+    const [items, total] = await this.workplaces.findMany(
+      tenantId,
+      skip,
+      take,
+      scopedCompanyFilter(actor, query.companyId),
+    );
     return paginate(items, query.page, query.pageSize, total);
   }
 
-  async get(tenantId: string, id: string) {
-    const workplace = await this.workplaces.findById(tenantId, id);
+  async get(tenantId: string, id: string, actor?: AuthenticatedUser) {
+    const workplace = await this.workplaces.findById(tenantId, id, companyScope(actor));
     if (!workplace) throw new NotFoundException('Workplace not found');
     return workplace;
   }

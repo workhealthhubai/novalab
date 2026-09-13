@@ -18,6 +18,7 @@ const valid = {
   addressDistrictId: null,
   addressLine: '',
   reportFooter: '',
+  radiologyStationAet: '',
 };
 
 describe('organization schema', () => {
@@ -50,6 +51,7 @@ describe('organization schema', () => {
         taxNumber: null,
         sgkRegistrationNumber: null,
         authorizationNumber: 'OSGB-123',
+        radiologyStationAet: 'XRAY01',
         authorizationDate: '2024-03-01T00:00:00.000Z',
         responsibleManager: null,
         phone: null,
@@ -69,5 +71,6 @@ describe('organization schema', () => {
     expect(values.authorizationDate).toBe('2024-03-01');
     expect(values.addressProvinceId).toBe(34);
     expect(values.taxNumber).toBe('');
+    expect(values.radiologyStationAet).toBe('XRAY01');
   });
 });

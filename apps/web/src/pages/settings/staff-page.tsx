@@ -1,3 +1,4 @@
+import { RecoveryLinkDialog } from '@/features/users/recovery-link-dialog';
 import { KeyRound, Pencil, Plus, Search, ShieldCheck, Trash2, UserCog } from 'lucide-react';
 import { useState } from 'react';
 import { PERMISSIONS } from '@osgb/shared-types';
@@ -38,7 +39,8 @@ import { toApiError } from '@/services/api-client';
 import { useAuthStore } from '@/stores/auth.store';
 import type { Role, StaffUser } from '@/types/user';
 
-type UserAction = { kind: 'new' } | { kind: 'edit' | 'roles' | 'password'; user: StaffUser } | null;
+type UserAction =
+  { kind: 'new' } | { kind: 'edit' | 'roles' | 'password' | 'recovery'; user: StaffUser } | null;
 type RoleAction = { kind: 'new' } | { kind: 'edit' | 'remove'; role: Role } | null;
 
 const fail = (title: string) => (error: unknown) => toast.error(title, toApiError(error).message);
@@ -171,6 +173,15 @@ function UsersTab() {
                           ) : null}
                           <AppButton
                             size="sm"
+                            variant="secondary"
+                            disabled={user.status !== 'ACTIVE'}
+                            aria-label={`${user.firstName} ${user.lastName} kurtarma bağlantısı`}
+                            onClick={() => setAction({ kind: 'recovery', user })}
+                          >
+                            Kurtarma bağlantısı
+                          </AppButton>
+                          <AppButton
+                            size="sm"
                             variant="ghost"
                             aria-label={`${user.firstName} ${user.lastName} şifre sıfırla`}
                             onClick={() => setAction({ kind: 'password', user })}
@@ -189,6 +200,9 @@ function UsersTab() {
         )
       ) : null}
 
+      {action?.kind === 'recovery' ? (
+        <RecoveryLinkDialog key={action.user.id} user={action.user} onClose={close} />
+      ) : null}
       <NewUserDialog
         open={action?.kind === 'new'}
         onOpenChange={(open) => !open && close()}

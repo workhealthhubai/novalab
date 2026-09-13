@@ -181,6 +181,15 @@ export class ProtocolsService {
         errorCode: 'PROTOCOL_ITEM_TRANSITION',
       });
     }
+    if (
+      (dto.status ?? item.status) === 'CANCELLED' &&
+      !(dto.note === undefined ? item.note : dto.note)?.trim()
+    ) {
+      throw new BadRequestException({
+        message: 'Tetkik iptal gerekçesi girilmelidir.',
+        errorCode: 'CANCELLATION_REASON_REQUIRED',
+      });
+    }
     await this.protocols.updateItem(tenantId, itemId, {
       ...(dto.status !== undefined
         ? {
@@ -214,7 +223,14 @@ export class ProtocolsService {
         errorCode: 'PROTOCOL_HAS_PENDING_ITEMS',
       });
     }
-    if (pending.length > 0) await this.protocols.cancelPendingItems(tenantId, id);
+    if (pending.length > 0) {
+      if (!dto.cancellationReason?.trim())
+        throw new BadRequestException({
+          message: 'Bekleyen tetkikler için iptal gerekçesi girilmelidir.',
+          errorCode: 'CANCELLATION_REASON_REQUIRED',
+        });
+      await this.protocols.cancelPendingItems(tenantId, id, dto.cancellationReason.trim());
+    }
     await this.protocols.update(tenantId, id, {
       status: ProtocolStatus.COMPLETED,
       closedAt: new Date(),
@@ -275,45 +291,49 @@ export class ProtocolsService {
     const scope = { tenantId, protocolId: id, deletedAt: null } as const;
     const employeeRef = { select: { id: true, firstName: true, lastName: true } };
     void employeeRef;
-    const [audiometry, spirometry, eye, ecg, pneumoconiosis, examinations] = await Promise.all([
-      this.prisma.audiometryTest.findMany({
-        where: scope,
-        select: { id: true, performedAt: true, ptaRight: true, ptaLeft: true, isBaseline: true },
-        orderBy: { performedAt: 'desc' },
-      }),
-      this.prisma.spirometryTest.findMany({
-        where: scope,
-        select: { id: true, performedAt: true, pattern: true, fev1: true, fvc: true },
-        orderBy: { performedAt: 'desc' },
-      }),
-      this.prisma.eyeExamination.findMany({
-        where: scope,
-        select: { id: true, performedAt: true, recommendation: true },
-        orderBy: { performedAt: 'desc' },
-      }),
-      this.prisma.ecgRecord.findMany({
-        where: scope,
-        select: { id: true, performedAt: true, interpretation: true, heartRate: true },
-        orderBy: { performedAt: 'desc' },
-      }),
-      this.prisma.pneumoconiosisReading.findMany({
-        where: scope,
-        select: { id: true, readAt: true, result: true, profusion: true, radiologyRequestId: true },
-        orderBy: { readAt: 'desc' },
-      }),
-      this.prisma.examination.findMany({
-        where: scope,
-        select: {
-          id: true,
-          status: true,
-          fitnessDecision: true,
-          performedAt: true,
-          approvedAt: true,
-          reportDocumentId: true,
-        },
-        orderBy: { createdAt: 'desc' },
-      }),
-    ]);
+    const [audiometry, spirometry, eye, ecg, pneumoconiosis, examinations, operations] =
+      await Promise.all([
+        this.prisma.audiometryTest.findMany({
+          where: scope,
+          select: { id: true, performedAt: true },
+          orderBy: { performedAt: 'desc' },
+        }),
+        this.prisma.spirometryTest.findMany({
+          where: scope,
+          select: { id: true, performedAt: true },
+          orderBy: { performedAt: 'desc' },
+        }),
+        this.prisma.eyeExamination.findMany({
+          where: scope,
+          select: { id: true, performedAt: true },
+          orderBy: { performedAt: 'desc' },
+        }),
+        this.prisma.ecgRecord.findMany({
+          where: scope,
+          select: { id: true, performedAt: true },
+          orderBy: { performedAt: 'desc' },
+        }),
+        this.prisma.pneumoconiosisReading.findMany({
+          where: scope,
+          select: { id: true, readAt: true, radiologyRequestId: true },
+          orderBy: { readAt: 'desc' },
+        }),
+        this.prisma.examination.findMany({
+          where: scope,
+          select: {
+            id: true,
+            status: true,
+            performedAt: true,
+            approvedAt: true,
+          },
+          orderBy: { createdAt: 'desc' },
+        }),
+        this.prisma.operationRecord.findMany({
+          where: scope,
+          select: { id: true, kind: true, date: true, status: true, protocolId: true },
+          orderBy: { date: 'desc' },
+        }),
+      ]);
     // Radiology requests carry no protocol id: those linked to the report's examination, plus the
     // patient's requests opened while the protocol was open.
     const windowEnd = protocol.closedAt ?? new Date();
@@ -335,27 +355,18 @@ export class ProtocolsService {
         bodyPart: true,
         status: true,
         requestedAt: true,
-        studyInstanceUid: true,
-        reportedAt: true,
       },
       orderBy: { requestedAt: 'desc' },
     });
     return {
-      audiometry: audiometry.map((t) => ({
-        ...t,
-        ptaRight: t.ptaRight === null ? null : Number(t.ptaRight),
-        ptaLeft: t.ptaLeft === null ? null : Number(t.ptaLeft),
-      })),
-      spirometry: spirometry.map((t) => ({
-        ...t,
-        fev1: t.fev1 === null ? null : Number(t.fev1),
-        fvc: t.fvc === null ? null : Number(t.fvc),
-      })),
+      audiometry,
+      spirometry,
       eye,
       ecg,
       pneumoconiosis,
       radiology,
       healthReport: examinations[0] ?? null,
+      operations,
     };
   }
 

@@ -7,12 +7,16 @@ import { AuditAction, PERMISSIONS } from '@osgb/shared-types';
 import type { AuthenticatedUser } from '@/common/interfaces';
 import type { AppConfig } from '@/config/configuration';
 import type { RefreshSession } from '@/generated/prisma/client';
+import type { PrismaService } from '@/infrastructure/prisma/prisma.service';
 import type { AuditService } from '@/modules/audit/audit.service';
 import { hashPassword } from '@/modules/users/users.service';
 import type { UsersService } from '@/modules/users/users.service';
 import type { UsersRepository } from '@/modules/users/users.repository';
 import { AuthService } from './auth.service';
-import type { RefreshSessionsRepository } from './refresh-sessions.repository';
+import {
+  RefreshSessionAlreadyConsumedError,
+  type RefreshSessionsRepository,
+} from './refresh-sessions.repository';
 
 const jwtConfig: AppConfig['jwt'] = {
   accessSecret: 'a'.repeat(48),
@@ -30,7 +34,7 @@ const authUser: AuthenticatedUser = {
   lastName: 'Admin',
   status: 'ACTIVE',
   roles: ['tenant_admin'],
-  permissions: [PERMISSIONS.USERS_READ],
+  permissions: [PERMISSIONS.USERS_READ, PERMISSIONS.RADIOLOGY_READ],
 };
 
 describe('AuthService', () => {
@@ -46,6 +50,10 @@ describe('AuthService', () => {
   const audit = {
     log: jest.fn().mockResolvedValue(undefined),
   } as unknown as jest.Mocked<AuditService>;
+  const findRadiologyRequest = jest.fn();
+  const prisma = {
+    radiologyRequest: { findFirst: findRadiologyRequest },
+  } as unknown as PrismaService;
   const logger = {
     setContext: jest.fn(),
     warn: jest.fn(),
@@ -69,6 +77,35 @@ describe('AuthService', () => {
         };
         sessions.set(session.id, session);
         return session;
+      },
+    ),
+    rotate: jest.fn(
+      async (
+        consumed: { id: string; tokenHash: string },
+        data: Omit<RefreshSession, 'revokedAt' | 'replacedById' | 'createdAt' | 'updatedAt'>,
+      ) => {
+        const old = sessions.get(consumed.id);
+        if (
+          !old ||
+          old.tokenHash !== consumed.tokenHash ||
+          old.revokedAt ||
+          old.replacedById ||
+          old.expiresAt.getTime() <= Date.now()
+        )
+          throw new RefreshSessionAlreadyConsumedError();
+        old.revokedAt = new Date();
+        old.replacedById = data.id;
+        const replacement: RefreshSession = {
+          ...data,
+          userAgent: data.userAgent ?? null,
+          ipAddress: data.ipAddress ?? null,
+          revokedAt: null,
+          replacedById: null,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        };
+        sessions.set(replacement.id, replacement);
+        return replacement;
       },
     ),
     findById: jest.fn(async (id: string) => sessions.get(id) ?? null),
@@ -102,6 +139,7 @@ describe('AuthService', () => {
       usersService,
       usersRepository,
       refreshSessions,
+      prisma,
       audit,
       logger,
     );
@@ -176,6 +214,20 @@ describe('AuthService', () => {
     );
   });
 
+  it('consumes a refresh token only once under concurrent rotation', async () => {
+    const first = await service.login({ email: 'admin@demo.local', password: 'Admin123!' }, {});
+    const results = await Promise.allSettled([
+      service.refresh(first.refreshToken, {}),
+      service.refresh(first.refreshToken, {}),
+    ]);
+
+    expect(results.filter((result) => result.status === 'fulfilled')).toHaveLength(1);
+    expect(results.filter((result) => result.status === 'rejected')).toHaveLength(1);
+    expect(refreshSessions.rotate).toHaveBeenCalledTimes(2);
+    expect(refreshSessions.revokeAllForUser).toHaveBeenCalledWith(authUser.id);
+    expect([...sessions.values()].filter((session) => !session.revokedAt)).toHaveLength(0);
+  });
+
   it('rejects a session revoked by logout/admin without revoking the other sessions', async () => {
     const login = await service.login({ email: 'admin@demo.local', password: 'Admin123!' }, {});
     const live = [...sessions.values()].find((s) => !s.revokedAt);
@@ -194,13 +246,56 @@ describe('AuthService', () => {
     await expect(service.logout('not-a-token', {})).resolves.toBeUndefined();
   });
 
-  it('issues and verifies short-lived DICOMweb viewer tokens', () => {
-    const { token } = service.issueDicomWebToken(authUser);
-    expect(service.verifyDicomWebToken(token)).toMatchObject({
+  it('issues and verifies a DICOMweb token scoped to one session, patient and study', async () => {
+    const login = await service.login({ email: 'admin@demo.local', password: 'Admin123!' }, {});
+    const access = new JwtService({}).decode<{ sid: string }>(login.accessToken);
+    const viewerUser = { ...authUser, sessionId: access.sid };
+    const scope = {
+      radiologyRequestId: 'request-1',
+      employeeId: 'employee-1',
+      studyInstanceUid: '1.2.3.4',
+    };
+    findRadiologyRequest.mockResolvedValue({ id: scope.radiologyRequestId });
+
+    const { token, maxAgeSeconds } = service.issueDicomWebToken(viewerUser, scope);
+    await expect(
+      service.verifyDicomWebAccess(
+        token,
+        `/dicom-web/studies/${scope.studyInstanceUid}/metadata`,
+        'GET',
+      ),
+    ).resolves.toMatchObject({
       sub: authUser.id,
       tid: authUser.tenantId,
+      sid: access.sid,
+      rid: scope.radiologyRequestId,
+      eid: scope.employeeId,
+      suid: scope.studyInstanceUid,
       type: 'dicomweb',
     });
-    expect(() => service.verifyDicomWebToken('bad')).toThrow();
+    expect(maxAgeSeconds).toBe(300);
+    await expect(
+      service.verifyDicomWebAccess(token, '/dicom-web/studies/9.9.9/metadata', 'GET'),
+    ).rejects.toMatchObject({ response: { errorCode: 'DICOMWEB_SCOPE_VIOLATION' } });
+    await expect(
+      service.verifyDicomWebAccess('bad', '/dicom-web/studies/1.2.3.4/metadata', 'GET'),
+    ).rejects.toBeDefined();
+  });
+
+  it('invalidates DICOMweb access when the login session is revoked', async () => {
+    const login = await service.login({ email: 'admin@demo.local', password: 'Admin123!' }, {});
+    const access = new JwtService({}).decode<{ sid: string }>(login.accessToken);
+    const scope = {
+      radiologyRequestId: 'request-1',
+      employeeId: 'employee-1',
+      studyInstanceUid: '1.2.3.4',
+    };
+    findRadiologyRequest.mockResolvedValue({ id: scope.radiologyRequestId });
+    const { token } = service.issueDicomWebToken({ ...authUser, sessionId: access.sid }, scope);
+    await refreshSessions.revoke(access.sid);
+
+    await expect(
+      service.verifyDicomWebAccess(token, '/dicom-web/studies/1.2.3.4/metadata', 'GET'),
+    ).rejects.toMatchObject({ response: { errorCode: 'DICOMWEB_SESSION_INVALID' } });
   });
 });

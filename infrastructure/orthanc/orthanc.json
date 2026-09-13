@@ -21,9 +21,10 @@
   "DicomServerEnabled": true,
   "DicomPort": 4242,
   "DicomAet": "OSGB",
-  "DicomCheckCalledAet": false,
-  "DicomAlwaysAllowStore": true,
-  "DicomAlwaysAllowEcho": true,
+  "DicomCheckCalledAet": true,
+  "DicomCheckModalityHost": true,
+  "DicomAlwaysAllowStore": false,
+  "DicomAlwaysAllowEcho": false,
   "UnknownSopClassAccepted": false,
 
   "StableAge": 60,
@@ -43,6 +44,18 @@
     "StudiesMetadata": "MainDicomTags",
     "SeriesMetadata": "Full",
     "EnableMetadataCache": true
+  },
+
+  "Worklists": {
+    "Enable": true,
+    "FilterIssuerAet": true,
+    "LimitAnswers": 50,
+    "SaveInOrthancDatabase": true,
+    "SetStudyInstanceUidIfMissing": true,
+    "DeleteWorklistsOnStableStudy": true,
+    "DeleteWorklistsDelay": 24,
+    "HousekeepingInterval": 60,
+    "LogMatchedWorklistIds": false
   },
 
   "PostgreSQL": {

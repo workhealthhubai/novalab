@@ -4,6 +4,9 @@ import { apiClient, unwrap } from './api-client';
 import { toPaginated } from './list';
 
 export const usersService = {
+  async recoveryLink(id: string): Promise<{ token: string; expiresAt: string }> {
+    return unwrap(await apiClient.post(`/users/${id}/password-link`));
+  },
   async list(query: {
     page?: number;
     pageSize?: number;

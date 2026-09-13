@@ -10,6 +10,7 @@ import { PinoLogger } from 'nestjs-pino';
 import type { ApiErrorResponse } from '@osgb/shared-types';
 import { Prisma } from '@/generated/prisma/client';
 import { getRequestId, type RequestWithUser } from '../interfaces/request-with-user.interface';
+import { safeRequestPath } from '../utils/safe-request-path';
 
 const STATUS_CODE_MAP: Record<number, string> = {
   400: 'BAD_REQUEST',
@@ -68,6 +69,9 @@ export class HttpExceptionFilter implements ExceptionFilter {
     const requestId = getRequestId(request);
 
     const normalized = this.normalize(exception);
+    const path = safeRequestPath(
+      (request.route as { path?: string } | undefined)?.path ?? request.originalUrl,
+    );
     const body: ApiErrorResponse = {
       success: false,
       error: {
@@ -77,13 +81,13 @@ export class HttpExceptionFilter implements ExceptionFilter {
       },
       requestId,
       timestamp: new Date().toISOString(),
-      path: request.originalUrl,
+      path,
     };
 
     const logPayload = {
       requestId,
       method: request.method,
-      path: request.originalUrl,
+      path,
       status: normalized.status,
       code: normalized.code,
       userId: request.user?.id,

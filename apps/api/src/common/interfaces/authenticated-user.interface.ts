@@ -11,6 +11,9 @@ export interface AuthenticatedUser {
   firstName: string;
   lastName: string;
   status: UserStatus;
+  /** Server-managed company scope; never supplied by query parameters. */
+  companyId?: string | null;
+  companyAccessActive?: boolean;
   roles: string[];
   permissions: Permission[];
   /** Refresh session behind this access token (present on tokens issued after sessions were added). */

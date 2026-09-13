@@ -88,16 +88,4 @@ export class ExaminationsController {
   ) {
     return this.examinations.setMeasurements(tenantId, actor, id, dto, extractRequestContext(req));
   }
-
-  @Post(':id/approve')
-  @RequirePermissions(PERMISSIONS.EXAMINATIONS_APPROVE)
-  @ApiOperation({ summary: 'Physician approval of a completed examination' })
-  approve(
-    @CurrentTenant() tenantId: string,
-    @CurrentUser() actor: AuthenticatedUser,
-    @Param() { id }: IdParamDto,
-    @Req() req: RequestWithUser,
-  ) {
-    return this.examinations.approve(tenantId, actor, id, extractRequestContext(req));
-  }
 }
