@@ -1,3 +1,4 @@
+import { healthReportsService } from '@/services/health-reports.service';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { createMemoryRouter, RouterProvider } from 'react-router';
@@ -1920,6 +1921,30 @@ describe('application skeleton', () => {
       expect(within(table).getByText('Karar bekliyor')).toBeInTheDocument();
       expect(within(table).getByText('2026-000001')).toBeInTheDocument();
     });
+  });
+
+  it('combines company and physician filters and clears them', async () => {
+    signInAs();
+    renderAt('/doctor/health-reports');
+    fireEvent.change(await screen.findByLabelText('Firma filtresi'), {
+      target: { value: 'Alpha' },
+    });
+    fireEvent.change(screen.getByLabelText('Hekim filtresi'), { target: { value: 'Test Doctor' } });
+    await waitFor(() =>
+      expect(healthReportsService.list).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          companySearch: 'Alpha',
+          physicianSearch: 'Test Doctor',
+          page: 1,
+        }),
+      ),
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Filtreleri temizle' }));
+    await waitFor(() =>
+      expect(healthReportsService.list).toHaveBeenLastCalledWith(
+        expect.objectContaining({ companySearch: undefined, physicianSearch: undefined, page: 1 }),
+      ),
+    );
   });
 
   it('opens the report editor with blockers, sections and test summaries', async () => {

@@ -102,19 +102,6 @@ export const PATHS = {
 /** Sidebar tree. Order follows the product specification. */
 export const NAV_TREE: NavEntry[] = [
   {
-    path: PATHS.workItems,
-    label: 'Eksik İşlemler',
-    icon: ClipboardList,
-    description: 'Bekleyen istemler, onaysız raporlar ve eksik kayıtlar.',
-  },
-  {
-    path: PATHS.documentTracking,
-    label: 'Belge Süre Takibi',
-    icon: FileText,
-    description: 'Sözleşme ve belgelerin bitiş tarihleri.',
-    permission: PERMISSIONS.DOCUMENTS_READ,
-  },
-  {
     path: PATHS.dashboard,
     label: 'Dashboard',
     icon: LayoutGrid,
@@ -139,6 +126,12 @@ export const NAV_TREE: NavEntry[] = [
         icon: ClipboardList,
         description: 'Ziyaret protokolleri, istenen tetkikler ve durum takibi.',
         permission: PERMISSIONS.PROTOCOLS_READ,
+      },
+      {
+        path: PATHS.workItems,
+        label: 'Eksik İşlemler',
+        icon: ClipboardList,
+        description: 'Bekleyen istemler, onaysız raporlar ve eksik kayıtlar.',
       },
       {
         path: PATHS.documentSigning,
@@ -262,6 +255,13 @@ export const NAV_TREE: NavEntry[] = [
         permission: PERMISSIONS.COMPANIES_READ,
       },
       {
+        path: PATHS.documentTracking,
+        label: 'Belge Süre Takibi',
+        icon: FileText,
+        description: 'Sözleşme ve belgelerin bitiş tarihleri.',
+        permission: PERMISSIONS.DOCUMENTS_READ,
+      },
+      {
         path: PATHS.doctors,
         label: 'Doktor Tanımları',
         icon: UserCog,
@@ -378,5 +378,9 @@ export function findNavLeaf(pathname: string): NavLeaf | undefined {
 
 /** Section containing the current location, if any. */
 export function findNavSection(pathname: string): NavSection | undefined {
-  return NAV_TREE.filter(isNavSection).find((section) => matches(pathname, section.basePath));
+  return NAV_TREE.filter(isNavSection).find(
+    (section) =>
+      matches(pathname, section.basePath) ||
+      section.children.some((child) => matches(pathname, child.path)),
+  );
 }

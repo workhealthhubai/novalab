@@ -212,3 +212,30 @@ Bağlantı tek kullanımlıktır. Yeni bağlantı oluşturulursa eskisi geçersi
 Üst çubuktaki bildirimler ve okunmamış sayacı size aittir. **Okundu** veya **Tümünü okundu** başka personelin durumunu değiştirmez. Muayene uyarılarını ilgili okuma yetkisi olan iç personel, şifre taleplerini kullanıcı yönetim yetkisi olan iç personel görür.
 
 Takip uyarıları çalışanın en güncel onaylı muayenesine dayanır. Tarihten 30, 7 ve 1 gün önce, aynı gün ve en az 7 gün gecikmede aşamalı uyarılar üretilir. Tarama kaçırılmışsa sistem mevcut aşamaya uygun uyarıyı üretir. Yeni muayene eski takibin yerini alır; yeni muayenede takip tarihi boşsa eski tarih için uyarı gönderilmez. Uygulama içi uyarı e-posta/SMS teslimatı anlamına gelmez.
+
+## Belge süre takibi
+
+Sol menüden **Belge Süre Takibi** ekranını açın.
+
+1. Yeni sözleşme veya belge için isteğe bağlı firma seçin, dosyayı ve bitiş tarihini girip **Belgeyi ekle** düğmesine basın. Dosya en fazla 25 MB olabilir. Sağlık verisi içeriyorsa ilgili kutuyu işaretleyin; bunun için tıbbi erişim yetkisi gerekir.
+2. Varsayılan liste bugünden itibaren 30 gün içinde bitecek belgeleri gösterir. **Süresi geçmiş**, **60/90 gün**, **Tarih belirtilmemiş** ve **Tüm belgeler** seçenekleri de vardır. Bitiş günü belge henüz geçmiş sayılmaz; hesap İstanbul takvim gününe göre yapılır.
+3. Eski belgelerin tarihini eklemek için **Tarih belirtilmemiş → Tarihi düzenle** yolunu izleyin. Tarihi boş kaydetmek bitiş tarihini kaldırır. Belgenin dosyası değişmez.
+4. **Belgeyi aç** dosyanın indirme bağlantısını açar. Firma seçimi hem listeyi süzer hem yeni yüklenecek belgeye atanır; farklı firma aramasına başlandığında önceki seçim temizlenir.
+
+Sözleşmenin dosyası ve süresi takip edilir; bu özellik tam sözleşme/görevlendirme yönetimi veya otomatik e-posta/SMS gönderimi değildir. Önceden yüklenmiş belgelerin tarihleri otomatik tahmin edilmedi.
+
+## Rapor filtreleri
+
+**Doktor Modülü → Sağlık Raporları** ekranında firma adı ve hekim adı/soyadı ile arayabilirsiniz. Bu alanlar tarih aralığı, rapor durumu, karar ve mevcut hasta/protokol aramasıyla birlikte çalışır. Hekim tam adı boşluklarla ayrılarak aranır. **Filtreleri temizle** ekran filtrelerini sıfırlar; hasta kartından gelinen hasta kapsamı korunur.
+
+Tarih filtresi İstanbul günlerine göre muayene tarihini, bu tarih yoksa oluşturulma tarihini kullanır. Filtre uygulanırken henüz raporu oluşturulmamış bekleyen istemler sonuçlara karıştırılmaz. Bunları **Eksik İşlemler** ekranından takip edin.
+
+## Eksik işlemler
+
+Sol menüde **Eksik İşlemler** tek sayfada üç liste sunar:
+
+- **Bekleyen tetkik ve rapor istemleri:** Açık/devam eden protokollerde henüz tamamlanmamış kalemler. Sayı hasta sayısı değil istem sayısıdır; aynı kişiye ait farklı istemler ayrı satırlardır.
+- **Onaylanmamış raporlar:** İptal edilmemiş, henüz onaylanmamış raporlar. Temel tarih, hekim seçimi ve karar eksikleri gösterilir; tüm tetkik ve onay engelleri rapor detayından incelenir.
+- **Eksik çalışan bilgileri:** Aktif çalışanlarda kimlik veya pasaport numarası, doğum tarihi ve firma ataması eksikleri. Pasaport numarası olan kişiye sırf T.C. kimlik numarası olmadığı için uyarı verilmez.
+
+Her liste kendi yetkisiyle açılır ve ayrı sayfalanır. **Kaydı aç** ilgili protokol, rapor veya çalışan kartına götürür. **Yenile** ile anında güncellenebilir; ekran açıkken listeler dakikada bir yenilenir. Firma hesaplarına bu kurum içi iş listeleri açılmaz.

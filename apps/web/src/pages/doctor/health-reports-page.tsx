@@ -236,8 +236,12 @@ export function HealthReportsPage() {
         {reports.data ? (
           reports.data.items.length === 0 && pending.rows.length === 0 ? (
             <EmptyState
-              title="Rapor yok"
-              description="Bir protokol açıp raporunu başlatın."
+              title={filtering ? 'Filtreye uygun rapor bulunamadı' : 'Rapor yok'}
+              description={
+                filtering
+                  ? 'Arama alanlarını veya tarih aralığını değiştirin.'
+                  : 'Bir protokol açıp raporunu başlatın.'
+              }
               className="rounded-none border-0"
             />
           ) : (

@@ -8,7 +8,16 @@ export const missingEmployeeWhere = (tenantId: string): Prisma.EmployeeWhereInpu
   tenantId,
   deletedAt: null,
   status: 'ACTIVE',
-  OR: [{ nationalId: null }, { nationalId: '' }, { birthDate: null }, { companyId: null }],
+  OR: [
+    {
+      AND: [
+        { OR: [{ nationalId: null }, { nationalId: '' }] },
+        { OR: [{ passportNumber: null }, { passportNumber: '' }] },
+      ],
+    },
+    { birthDate: null },
+    { companyId: null },
+  ],
 });
 
 @Injectable()
@@ -126,6 +135,7 @@ export class WorkItemsService {
           firstName: true,
           lastName: true,
           nationalId: true,
+          passportNumber: true,
           birthDate: true,
           companyId: true,
           createdAt: true,
@@ -139,7 +149,7 @@ export class WorkItemsService {
         title: `${r.firstName} ${r.lastName}`,
         description: 'Çalışan bilgileri',
         reasons: [
-          ...(!r.nationalId ? ['Kimlik numarası eksik'] : []),
+          ...(!r.nationalId && !r.passportNumber ? ['Kimlik numarası eksik'] : []),
           ...(!r.birthDate ? ['Doğum tarihi eksik'] : []),
           ...(!r.companyId ? ['Firma atanmamış'] : []),
         ],

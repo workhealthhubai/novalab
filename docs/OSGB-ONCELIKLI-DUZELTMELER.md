@@ -83,3 +83,17 @@ Bu oturumda 3000 portunda başka proje bulunduğu için OSGB API 3002'de, web 51
 - **A08:** Yönetici destekli kurtarma tamamlandı. Kullanıcıya otomatik e-posta ile bağlantı gönderimi dış sağlayıcı entegrasyonuna bağlı.
 
 Eğitim, saha İSG süreçleri, resmî entegrasyon ve diğer kapsam eksikleri bu ilk düzeltme paketinin dışında kalıyor.
+
+## Günlük takip paketi — 13 Eylül 2026
+
+- **Belge Süre Takibi:** Dosya yüklerken bitiş tarihi; mevcut belgede tarih düzenleme/temizleme; bugün ve 30/60/90 gün, süresi geçmiş, tarihsiz ve tüm belgeler filtreleri. Liste ve tarih düzenleme mevcut tenant/tıbbi erişim sınırlarını korur. Migration `20260913110000_document_expiry` yerel veritabanına uygulandı.
+- **Sağlık Raporları:** Firma adı ve hekim adı/soyadı araması, durum/karar/tarih ile birlikte uygulanır. Tarih aralığı İstanbul gününü esas alır; ters aralık reddedilir. Filtre varken henüz oluşturulmamış rapor istemleri sonuçlara karıştırılmaz.
+- **Eksik İşlemler:** Bekleyen istemler, onaysız raporlar ve kimlik/pasaport, doğum tarihi, firma bilgisi eksik aktif çalışanlar. Her grup ayrı yetkiyle ve sayfalama ile sunulur. İptal edilmiş protokoller iş beklemeye devam etmez. Kimlik/pasaport değerleri iş listesi yanıtına eklenmez.
+
+Doğrulama: 234 API ve 128 web testi geçti. 22 gerçek yerel HTTP kontrolü; tarih sınırları, birleşik filtreler, tenant/tıbbi erişim, iptal edilmiş protokoller ve pasaportla kayıtlı çalışan kontrolü dahil. Testler yalnızca kendilerinin oluşturduğu geçici kayıtları temizler. Belge, eksik işlem ve rapor filtre ekranları gerçek tarayıcıda kontrol edildi. Lint, tip kontrolü ve derleme tamamlandı; mevcut web paket boyutu uyarısı devam ediyor.
+
+```sh
+ACCEPTANCE_API_URL=http://localhost:3002 pnpm --filter @osgb/api exec tsx test/tracking.acceptance.ts
+```
+
+Bu paket otomatik sözleşme yenileme veya belge bitişi için e-posta/SMS göndermez; bitiş tarihi girilmemiş belgeler yaklaşan süre listesine dahil değildir. Ayrıntılı kullanım adımları kullanım kılavuzuna eklendi.

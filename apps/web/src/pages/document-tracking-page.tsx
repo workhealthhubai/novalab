@@ -119,7 +119,11 @@ export function DocumentTrackingPage() {
               <Input
                 id="tracking-company-search"
                 value={companySearch}
-                onChange={(e) => setCompanySearch(e.target.value)}
+                onChange={(e) => {
+                  setCompanySearch(e.target.value);
+                  setCompanyId(null);
+                  setPage(1);
+                }}
                 placeholder="Firma adını yazın"
               />
             </div>

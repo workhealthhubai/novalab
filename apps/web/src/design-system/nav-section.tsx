@@ -30,7 +30,11 @@ const headerClass =
 export function NavSection({ section, collapsed = false, onNavigate }: NavSectionProps) {
   const { pathname } = useLocation();
   const containsActive =
-    pathname === section.basePath || pathname.startsWith(`${section.basePath}/`);
+    pathname === section.basePath ||
+    pathname.startsWith(`${section.basePath}/`) ||
+    section.children.some(
+      (child) => pathname === child.path || pathname.startsWith(`${child.path}/`),
+    );
   const [open, setOpen] = useState(containsActive);
   // Re-open when navigation lands inside this section (state adjustment during render, no effect).
   const [wasActive, setWasActive] = useState(containsActive);
